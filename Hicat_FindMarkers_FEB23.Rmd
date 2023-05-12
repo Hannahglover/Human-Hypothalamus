@@ -1,0 +1,45 @@
+```{r}
+#https://data.nemoarchive.org/biccn/grant/u01_devhu/kriegstein/transcriptome/scell/10x_v2/human/processed/analysis/Herb_2022_Hypothalamus/SeuratObj/
+library(Seurat)
+library(tidyverse)
+EdKaZhouHypoNeurons = readRDS("~/Downloads/EdKaZhouHypoNeurons_mt10_integrated.rds")
+Meta = read.csv("~/Downloads/HSatlasNeuron_metadata.csv", row.names = 1)
+HiCat250 = Meta %>% dplyr::select(HiCat_DE_250)
+AdultHypo = subset(EdKaZhouHypoNeurons, cells = row.names(Meta))
+
+AdultHypo = AddMetaData(AdultHypo, HiCat250, "HiCat250")
+Idents(AdultHypo) = "HiCat250"
+DefaultAssay(AdultHypo) = "RNA"
+
+TFS = read.csv("~/Library/CloudStorage/Box-Box/HG2553 Main Folder/Useful Gene Lists/Human TFs.csv", head=F)
+NPS = read.csv("~/Dropbox/Columbia/Claudia Maria Hannah Shared/Punch Bipsies Manuscript/Neuropeptide list - 6MAR20.csv", head=F)
+
+AllTFsNPs = subset(c(TFS$V1, toupper(NPS$V1)), c(TFS$V1, toupper(NPS$V1)) %in% row.names(AdultHypo))
+
+
+Markers = FindAllMarkers(AdultHypo, logfc.threshold = 0.25, features = AllTFsNPs)
+Markers2 = subset(Markers, Markers$p_val_adj < 0.05)
+write.csv(Markers, "Hicat_DEGs.csv")
+
+CompileTopMarkers = as.data.frame(matrix(ncol = 5, nrow = 0))
+colnames(CompileTopMarkers) = c("Hicat", "Top1", "Top2", "Top3", "Concat")
+
+for(x in unique(Markers2$cluster)){
+GetMarkers = subset(Markers2, Markers2$cluster == x)
+GetMarkers = GetMarkers[order(-GetMarkers$avg_log2FC), ]
+
+if(dim(GetMarkers)[1] >= 3){
+Top3 = head(GetMarkers, 3)
+DF = as.data.frame(t(c(x, Top3$gene, paste(Top3$gene, collapse ="/"))))
+colnames(DF) = c("Hicat", "Top1", "Top2", "Top3", "Concat")
+
+}else{
+NAs = 3- dim(GetMarkers)[1]
+DF = as.data.frame(t(c(x, GetMarkers$gene, rep(NA, NAs), paste(GetMarkers$gene, collapse ="/"))))
+colnames(DF) = c("Hicat", "Top1", "Top2", "Top3", "Concat")
+}
+CompileTopMarkers = rbind(CompileTopMarkers, DF)
+write.csv(CompileTopMarkers, "~/Downloads/HicatMarkers/HiCatDEGs_Comb.csv")
+}
+```
+

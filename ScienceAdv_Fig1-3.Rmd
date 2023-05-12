@@ -1,0 +1,2705 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+#SETUP
+```{r SETUP}
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#install.packages("BiocManager")
+#BiocManager::install(version = "3.16")
+#BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats','limma', 'lme4', 'S4Vectors', 'SingleCellExperiment','SummarizedExperiment', 'batchelor', 'HDF5Array','terra', 'ggrastr'))
+#install.packages("devtools")
+#devtools::install_github('cole-trapnell-lab/monocle3')
+
+#install.packages("Seurat")
+#install.packages("tidyverse")
+#install.packages("ggpubr")
+#install.packages("plotly")
+#install.packages("plyr") #v1.8.7
+#install.packages("htmlwidgets") #v1.5.4
+#install.packages("monocle3") #v1.0.0
+#install.packages("scales") #v1.2.1
+#install.packages("igraph") #v1.3.4
+#install.packages("ggraph") #v2.0.5
+#install.packages("graphlayouts") #v0.8.0
+#install.packages("qgraph") #v1.9.2a
+#install.packages("circlize") #v1.9.2a
+#BiocManager::install("ComplexHeatmap")
+
+
+library(Seurat)
+library(tidyverse)
+library(ggpubr)
+library(plotly)
+library(plyr) #v1.8.7
+library(htmlwidgets) #v1.5.4
+#library(monocle3) #v1.0.0
+library(scales) #v1.2.1
+library(igraph) #v1.3.4
+library(ggraph) #v2.0.5
+library(graphlayouts) #v0.8.0
+library(qgraph) #v1.9.2
+library(ggalluvial)
+
+
+
+DEGs = function(Input){
+Input.markers <- FindAllMarkers(Input, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) 
+return(Input.markers)}
+
+CheckUMAP = function(SeuFilez, Dims = c(1,2), red = "umap"){
+  if(class(CheckInput) == "data.frame"){
+CheckMeta = as.data.frame(c(rep("RoI", length(row.names(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = row.names(CheckInput)
+  }else{
+    CheckMeta = as.data.frame(c(rep("RoI", length(colnames(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = colnames(CheckInput)
+  }
+
+SeuFilez = AddMetaData(SeuFilez, CheckMeta, "CheckMeta")
+Idents(SeuFilez) = "CheckMeta"
+DimPlot(SeuFilez, dims = Dims, reduction=red)
+}
+
+
+CheckUMAP_3D = function(SeuFilez){
+  if(class(CheckInput) == "data.frame"){
+CheckMeta = as.data.frame(c(rep("RoI", length(row.names(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = row.names(CheckInput)
+  }else{
+    CheckMeta = as.data.frame(c(rep("RoI", length(colnames(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = colnames(CheckInput)
+  }
+
+PlotInput = merge(KaZhou_3D, CheckMeta, by = 0, all.x=T)
+PlotInput[is.na(PlotInput)] = "NA"
+return(PlotInput)
+}
+
+
+########################################################################
+GenerateMetaData = function(ListMeta){
+MetaOutput = as.data.frame(matrix(ncol = 1, nrow =0))  
+for(x in seq(1,length(ListMeta),1)){
+if(class(ListMeta[[x]]) == "data.frame"){
+Temp = as.data.frame(rep(names(ListMeta)[[x]], length(row.names(ListMeta[[x]]))))  
+colnames(Temp) = "Pop"
+row.names(Temp) = row.names(ListMeta[[x]])
+}else{
+Temp = as.data.frame(rep(names(ListMeta)[[x]], length(colnames(ListMeta[[x]]))))  
+colnames(Temp) = "Pop"
+row.names(Temp) = colnames(ListMeta[[x]]) 
+}
+MetaOutput = rbind(MetaOutput, Temp)  
+}
+return(MetaOutput)
+}
+########################################################################
+
+GeneLists = list()
+GeneLists[["Zhou_MainMarkers"]] = c("POMC", "VIM", "HES1", "HMGA2", "ARHGAP28", "NES", "ASCL1", "NBPF10", "NBPF15", "PLAGL1", "SFTA3", "STMN2", "SYT1", "SLC32A1", "GAD2", "HDC", "SLC17A6", "PDGFRA", "APOD", "GPR75-ASB3", "MBP", "MOG", "AQP4", "AGT", "FAM107A", "CCDC153", "CCDC74A", "CCDC74B", "LRTOMT", "AIF1", "CX3CR1", "CLDN5", "FLT1", "SLC38A5", "NDUFA4L2", "PDGFRB", "PTGDS", "COL1A1")
+
+GeneLists[["Zhou_MainMarkersV2"]] = c("OLIG1", "OLIG2", "SOX8", "JUNB", "EGR1",  "MYC", "OLIG1","OLIG2", "NKX2-2", "FOXJ1", "GLIS3", "AXNA1","TBX2", "TBX3", "LHX2", "RAX", "SHH",  "SIX3", "SIX6", "SLC1A3", "NES",  "FABP7", "FAM107A", "CD82","TBX3", "RAX", "SIX3", "OTX2", "IRX2", "IRX3", "IRX5", "DLX1", "DLX2", "DLX5", "DLX6", "SOX3", "LHX1", "ONECUT2", "OTP")
+
+
+GeneLists[["BroadGenes"]] = c("SYT1", "SNAP25", "TUBB3","SYP", #Broad Neuronal 
+               "SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1", #GABAergic
+           "SLC17A6", "SLC17A8") #Glutaminergic
+GeneLists[["HypothalamicProgenSubclass"]] =c("VIM", "ASCL1", #Hypothalamic Progenitor - And/or
+            "HES1", "MKI67", "FABP7", "TTYH1", "HMGA2", "MEIS2", "SLC1A3", "FAM107A", "NKX2-1", "NHLH2", "DLX1", "OLIG2", "DLX6-AS1", "STMN2", "HOPX", "HES1", "NES", "SOX2", "EGFR", "DLL1", "CLDN10", "FAM107A", "GADD45G", "HES6", "SLC1A2") #Hypothalamic subclasses
+
+GeneLists[["OligList"]] = unique(c("APOD", "PMP22", "MAG", "OLIG1", "PLLP", "CSPG4", "PDGFRA", "NEU4", "TNS3", "FYN", "TCF7L2", "MAL", "MOG", "PLP1", "SERINC5", "TFRC", "OLIG1", "OLIG2", "CNP", "ST8SIA1", "CD9"))
+GeneLists[["AstroMicro"]] = unique(c("GJA1", "GFAP", "AQP4", "SLC7A10", "ALDH1L1", "AGT", "SLC1A3", "S100B",  "ALDOC", "SLC1A2", "ID3", "ASCL1", "BTG2", "APOE", "C1QB", "AIF1", "P2RY12", "MRC1"))
+GeneLists[["EpendyTanyList"]] = c("FOXJ1", "RAX", "ADM",  "EMX2", "LHX2", "TMEM212", "CRYM", "CCDC153", "RFX2", "RFX3", "RFX4", "NPAS3", "COL23A1", "CD59", "SLC17A8", "VCAN", "FRZB", "PENK", "COL25A1", "CACNA2D2", "STOML3", "TMEM212", "SLC7A11", "PCP4L1", "PLTP", "TGFB2", "NR2E1", "EPHB1", "P3H2", "NELL2", "FGF10", "RGCC", "GRIA2", "RLBP1", "SIX6", "SCN7A", "MEST", "IGFBP5", "RGS7BP")
+GeneLists[["EndoList"]] = c("SLCO1C1", "SLC38A5", "MYH11", "MRC1", "CLDN5", "ITM2A", "FLT1")
+GeneLists[["MuralPeriVLMCList"]] = c("VTN",  "COL1A1", "COL3A1", "LUM", "DCN", "PTGDS", "AMBP", "RGS5", "ACTA2", "TAGLN", "ABCC9", "KCNJ8") #3 GenMural, 6 VLMC, 2 Peri, 1 SMA
+
+
+
+
+
+ClusterFunc_All_RNA = function(SeuFile){
+Filename = as.character(substitute(SeuFile))
+
+for(y in set.kparam){
+for(z in set.dim){
+for(v in set.res){
+DefaultAssay(SeuFile) = "integrated"
+SeuFile <- FindNeighbors(SeuFile, k.param=y, dims=1:z)
+SeuFile <- FindClusters(SeuFile, resolution = v)
+DefaultAssay(SeuFile) = "RNA"
+
+pdf(paste("ALLFETAL_", Filename, "_res", v, "_k", y, "_dim", z, "_umapSML_GLOTMP.pdf", sep=""), width=12, height=10)
+dimplot = DimPlot(SeuFile, reduction="umap", label=T)
+print(dimplot)
+dev.off()
+
+
+pdf(paste("ALLFETAL_", Filename, "_res", v, "_k", y, "_dim", z, "_umapLGE_GLOTMP.pdf", sep=""), width=25, height=25)
+dimplot = DimPlot(SeuFile, reduction="umap", label=T)
+print(dimplot)
+dev.off()
+
+###VLNS
+GeneLists2 = GeneLists
+DefaultAssay(SeuFile) = "RNA"
+for(g in names(GeneLists2)){
+ GeneLists2[[g]] = subset(GeneLists2[[g]], GeneLists2[[g]] %in% row.names(SeuFile))
+}
+
+
+AllVlns = list()
+
+for(d in names(GeneLists2)){
+Genes = GeneLists2[[d]]
+StorePlots = list()
+  for(x in Genes[1]){
+            plotA <- VlnPlot(SeuFile, features = x, pt.size = 0, same.y.lims = F,)
+            plotA <- plotA + coord_flip()+ theme(axis.ticks.x= element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank(), 
+                                                 axis.ticks.y = element_blank(), legend.position = "none", plot.title = element_text(size=12))+ labs(title = d, subtitle = Genes[1])
+            StorePlots[[x]] = plotA 
+            }
+  for(x in Genes[2:length(Genes)]){
+            plotB <- VlnPlot(SeuFile, features = x, pt.size = 0, same.y.lims = F,)
+            plotB <- plotB + coord_flip()+ theme(axis.ticks.x= element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank(), 
+                      axis.ticks.y = element_blank(), legend.position = "none", axis.text.y = element_blank(), plot.title = element_text(size=12))
+           StorePlots[[x]] = plotB
+           }
+AllVlns[[d]] <- ggarrange(plotlist = StorePlots, widths=c(1.4, rep(1, length(Genes)-1)), ncol = 40,  nrow = 1)  
+}
+pdf(paste("ALLFETAL_", Filename, "_res", v, "_k", y, "_dim", z, "_AllMultiVlns_GLOTMP.pdf", sep=""), width=40, height=length(unique(SeuFile@active.ident)))
+print(AllVlns)
+dev.off()
+
+#Cell No
+CellNo = as.data.frame(table(SeuFile@meta.data$seurat_clusters))
+write.csv(CellNo, paste("ALLFETAL_", Filename, "_counts_k", y, "_dim", z, "_res", v, "_GLOTMP.csv", sep=""), row.names = F)
+}}
+
+#Feature Plots  
+FPList = list()  
+
+for(d in names(GeneLists2)){
+Genes = GeneLists2[[d]]
+
+FPSinglePage = list()
+FPSinglePage[[1]] = FeaturePlot(SeuFile, Genes[1], reduction="umap") + labs(title=paste(d, Genes[1]))
+for(p in seq(2, length(Genes), 1)){
+FPSinglePage[[p]] = FeaturePlot(SeuFile, Genes[p], reduction="umap") 
+}
+FPList[[d]] = ggarrange(plotlist = FPSinglePage, ncol=5, nrow=8)
+}
+
+pdf(paste("ALLFETAL_", Filename, "_dim", z, "_AllFPs_GLOTMP.pdf", sep=""), width = 25, height = 45)
+print(FPList)
+dev.off()
+}}
+
+
+
+
+PlotFunc = function(SeuFile){
+Filename = as.character(substitute(SeuFile))
+
+pdf(paste("ALLFETAL_", Filename, "_umapSML_GLOTMP.pdf", sep=""), width=12, height=10)
+dimplot = DimPlot(SeuFile, reduction="umap", label=T)
+print(dimplot)
+dev.off()
+
+
+pdf(paste("ALLFETAL_", Filename,  "_umapLGE_GLOTMP.pdf", sep=""), width=25, height=25)
+dimplot = DimPlot(SeuFile, reduction="umap", label=T)
+print(dimplot)
+dev.off()
+
+###VLNS
+AllVlns = list()
+
+for(d in names(GeneLists)){
+Genes = GeneLists[[d]]
+StorePlots = list()
+  for(x in Genes[1]){
+            plotA <- VlnPlot(SeuFile, features = x, pt.size = 0, same.y.lims = F,)
+            plotA <- plotA + coord_flip()+ theme(axis.ticks.x= element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank(), 
+                                                 axis.ticks.y = element_blank(), legend.position = "none", plot.title = element_text(size=12))+ labs(title = d, subtitle = Genes[1])
+            StorePlots[[x]] = plotA 
+            }
+  for(x in Genes[2:length(Genes)]){
+            plotB <- VlnPlot(SeuFile, features = x, pt.size = 0, same.y.lims = F,)
+            plotB <- plotB + coord_flip()+ theme(axis.ticks.x= element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank(), 
+                      axis.ticks.y = element_blank(), legend.position = "none", axis.text.y = element_blank(), plot.title = element_text(size=12))
+           StorePlots[[x]] = plotB
+           }
+AllVlns[[d]] <- ggarrange(plotlist = StorePlots, widths=c(1.4, rep(1, length(Genes)-1)), ncol = 40,  nrow = 1)  
+}
+pdf(paste("ALLFETAL_", Filename, "_AllMultiVlns_GLOTMP.pdf", sep=""), width=40, height=length(unique(SeuFile@active.ident)))
+print(AllVlns)
+dev.off()
+
+#Cell No
+CellNo = as.data.frame(table(SeuFile@meta.data$seurat_clusters))
+write.csv(CellNo, paste("ALLFETAL_", Filename, "_counts_GLOTMP.csv", sep=""), row.names = F)
+
+#Feature Plots  
+FPList = list()  
+
+for(d in names(GeneLists)){
+Genes = GeneLists[[d]]
+
+FPSinglePage = list()
+FPSinglePage[[1]] = FeaturePlot(SeuFile, Genes[1], reduction="umap") + labs(title=paste(d, Genes[1]))
+for(p in seq(2, length(Genes), 1)){
+FPSinglePage[[p]] = FeaturePlot(SeuFile, Genes[p], reduction="umap") 
+}
+FPList[[d]] = ggarrange(plotlist = FPSinglePage, ncol=5, nrow=8)
+}
+
+pdf(paste("ALLFETAL_", Filename, "_AllFPs_GLOTMP.pdf", sep=""), width = 25, height = 45)
+print(FPList)
+dev.off()
+}
+
+```
+
+#COLORS
+```{r}
+#19 Colors
+LightPink =   "#ffc2d4"
+MedPink =     "#ff9ebb"
+DarkPink =    "#ff7aa2"
+DarkRed =     "#9e1b44"
+LightRed =    "#d64050"
+DarkOrange =  "#f36c44"
+LightOrange = "#faad60"
+Mustard =     "#fecf29"
+LightYellow = "#fee08b"
+GreenLighest ="#aad576"
+GreenMedLight="#78a02d"
+GreenMedDark ="#538d22"
+GreenDark =   "#245501"
+BlueDark =    "#133c55"
+BlueMedDark = "#386fa4"
+BlueMedLight ="#59a5d8"
+BlueLighest = "#84d2f6"
+LightPurple = "#b185db"
+DarkPurple =  "#7251b5"
+Grey =        "#666666"
+HeatmapBlue = BlueMedDark
+
+CellPopColors = c("Neuroepithelial"= GreenLighest, "Dividing"= GreenMedLight, "RadialGlia" = GreenMedDark, "IntProgen" = GreenDark, "Oligodendrocytes [Dividing]"= BlueDark, "Oligodendrocytes [Immature]" = BlueMedDark, "Oligodendrocytes [Intermediate]"= BlueMedLight, "Oligodendrocytes [Mature]"= BlueLighest,  "NeuronalProgenitors" = LightPurple,  "Neuronal"= DarkPurple, "Astrocytes" = DarkPink, "Ependymal" = MedPink, "Tanycytes" = LightPink, "Microglia" = LightRed,   "Pericytes" = Mustard , "vSMC" =LightYellow,  "VLMC" = LightOrange,   "Endothelial" = DarkOrange,  "Blood" =DarkRed) #19
+
+TimepointColors_Fetal = c("GW6" = LightPink, "GW7" = DarkPink, "GW8" = DarkRed, "GW10" = DarkOrange, "GW12" = LightOrange, "GW15" = Mustard, "GW16" = GreenLighest, "GW18" = GreenMedDark, "GW19" = BlueMedDark, "GW20" = BlueLighest, "GW22" = LightPurple, "GW25" = DarkPurple) #12
+
+TimepointColors_FetalZhou = c("GW6" = LightPink, "GW7" = MedPink, "GW7 [Zhou]" = DarkPink, "GW8 [Zhou]" = DarkRed, "GW10" = LightRed, "GW10 [Zhou]" = DarkOrange, "GW12 [Zhou]" = LightOrange, "GW15 [Zhou]" = Mustard, "GW16" = LightYellow, "GW18" = GreenLighest, "GW18 [Zhou]" = GreenMedDark, "GW19" = BlueDark, "GW20" = BlueMedDark, "GW20 [Zhou]"= BlueLighest, "GW22" = LightPurple, "GW25"= DarkPurple) #16
+
+TimepointColors_FetalAdult = c("Adult" = DarkPink, "GW10" = DarkOrange, "GW12" = LightOrange, "GW15" = Mustard, "GW16" = GreenLighest, "GW18" = GreenMedDark, "GW19" = BlueMedDark, "GW20" = BlueLighest, "GW22" = LightPurple, "GW25" = DarkPurple) #10
+
+TimepointColors_FetalAdultDissect = c("GW10" = LightPink, "GW12" = MedPink, "GW15" = DarkPink, "GW16" = DarkRed, "GW18" = LightRed, "GW19" = DarkOrange, "GW20" = LightOrange, "GW22" = Mustard, "GW25" = LightYellow, "Adult_PO" = GreenLighest, "Adult_PO/SO" = GreenMedDark, "Adult_SO" = BlueDark, "Adult_SO/TUB" = BlueMedDark, "Adult_TUB"= BlueLighest, "Adult_TUB/MN" = LightPurple, "Adult_MN"= DarkPurple)
+
+TrimesterColors = c("Tri1" = Mustard, "Tri2" = GreenMedDark, "Adult" = DarkPink)
+
+NucleiColors = c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed, "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark, "AH"= BlueMedDark, "SMN" = BlueLighest, "MN"= LightPurple, "ZI" = DarkPurple,  "Unassigned" = Grey, "Ukn" = Grey)
+
+
+Fig3Colors= c("Human Adult" = DarkRed,    "Human Fetal"  = LightOrange,   "Mouse Adult" = GreenMedDark,   "Mouse Fetal" = BlueMedLight, "Mouse Postnatal" = DarkPurple)
+
+
+Fig3_Colors_Study = c("Kim [Mouse Development]" = LightPink, "Romanov [Mouse Development]" = MedPink, "Moffit [Mouse Adult PO]" = DarkPink, "Mickelsen [Mouse Adult LH]" = DarkRed, "Wen [Mouse Adult SCN]" = LightRed, "Morris [Mouse Adult SCN]" = DarkOrange, "Liu [Mouse Adult VMH]"= LightOrange,  "Kim [Mouse Adult VMH]" = Mustard, "Affinati [Mouse Adult VMH]"= GreenLighest, "Campbell [Mouse Adult ARC]"= GreenMedDark, "Flynn [Mouse Adult VPH]" = BlueDark,  "Chen [Mouse Adult]" = BlueMedDark, "Zhao [Human Fetal]"= BlueLighest, "Herb [Human Fetal]" = LightPurple,  "Siletti [Human Adult]"= DarkPurple) #16
+
+POMC_ClustCols = c("POMC_1" = DarkPink, "POMC_2" = DarkOrange, "POMC_3" = LightOrange, "POMC_4" = Mustard, "POMC_5" = GreenLighest, "POMC_6" = GreenMedDark, "POMC_7" = BlueMedDark, "POMC_8" = BlueLighest, "POMC_9" = LightPurple, "POMC_10" = DarkPurple) #10
+
+
+POMC_ClustCols_V3 = c("POMC_1" = DarkPink, "POMC_2" = DarkOrange, "POMC_3" = Mustard, "POMC_4" = GreenLighest, "POMC_5" = BlueMedLight, "POMC_6" = LightPurple) #10
+
+#Fig3_SeuColors = c(0 = LightPink, 1 = MedPink, 2 = DarkPink, 3 = colorRampPalette(c(DarkPink, DarkRed))(3)[2], 4 = DarkRed , 5 = LightRed, 6 = colorRampPalette(c(LightRed, DarkOrange))(3)[2], 7 = DarkOrange, 8 = colorRampPalette(c(DarkOrange, LightOrange))(3)[2], 9 = LightOrange, 10 = colorRampPalette(c(LightOrange, Mustard))(3)[2], 11 = Mustard , 12 = LightYellow,  13 = colorRampPalette(c(LightYellow, GreenLighest))(3)[2], 14 = GreenLighest, 15 = colorRampPalette(c(GreenLighest, GreenMedLight))(3)[2] , 16 = GreenMedLight, 17 = GreenMedDark, 18 = GreenDark,  19 = colorRampPalette(c(GreenDark, BlueDark))(4)[2],  20 = colorRampPalette(c(GreenDark, BlueDark))(4)[3] , 21 = BlueDark,  22 = colorRampPalette(c(BlueDark, BlueMedDark))(3)[2] , 23 = BlueMedDark, 24 = BlueMedLight, 25 = colorRampPalette(c(BlueMedLight, BlueLighest))(3)[2] , 26 = BlueLighest,  27 = colorRampPalette(c(GreenDark, BlueDark))(4)[2],  28 = colorRampPalette(c(GreenDark, BlueDark))(4)[3],  29 = LightPurple, 30 = colorRampPalette(c(LightPurple, DarkPurple))(3)[2], 31 = DarkPurple, 32 = "#532e9e", 33= "#31136e", 34 = "#530748") #19
+
+
+
+Fig3_SeuColors = c(LightPink, MedPink, DarkPink, colorRampPalette(c(DarkPink, DarkRed))(3)[2], DarkRed,  LightRed, colorRampPalette(c(LightRed, DarkOrange))(3)[2], DarkOrange, colorRampPalette(c(DarkOrange, LightOrange))(3)[2], LightOrange, colorRampPalette(c(LightOrange, Mustard))(3)[2], Mustard, LightYellow, colorRampPalette(c(LightYellow, GreenLighest))(3)[2], GreenLighest, colorRampPalette(c(GreenLighest, GreenMedLight))(3)[2],  GreenMedLight, GreenMedDark, GreenDark, colorRampPalette(c(GreenDark, BlueDark))(4)[2],  colorRampPalette(c(GreenDark, BlueDark))(4)[3], BlueDark,  colorRampPalette(c(BlueDark, BlueMedDark))(3)[2], BlueMedDark, BlueMedLight, colorRampPalette(c(BlueMedLight, BlueLighest))(3)[2], BlueLighest, colorRampPalette(c(BlueLighest, LightPurple))(4)[2], colorRampPalette(c(BlueLighest, LightPurple))(4)[3], LightPurple, colorRampPalette(c(LightPurple, DarkPurple))(3)[2], DarkPurple,"#532e9e", "#31136e", "#530748") #19
+
+
+
+```
+
+#FIG1-CLUSTERING
+```{r FIG-1-CLUST}
+#KaZhouAll = readRDS("~/Library/CloudStorage/Box-Box/HG2553 Personal Folder/Science Advances/KaZhouAll_mt10_integrated.rds")
+
+set.dim = 30
+set.res = 1
+set.kparam = c(400)
+#ClusterFunc_All_RNA(KaZhouAll)
+
+KaZhouAll_UMAP = as.data.frame(KaZhouAll@reductions$umap@cell.embeddings)
+KaZhou_3D = read.csv("~/Library/CloudStorage/Box-Box/HG2553 Personal Folder/Science Advances/KaZhou_3D_coordinates.csv")
+row.names(KaZhou_3D) = KaZhou_3D$X
+#UMAP_1 = KaZhou_3D %>% dplyr::select(umap_1)
+##UMAP_2 = KaZhou_3D %>% dplyr::select(umap_2)
+#UMAP_3 = KaZhou_3D %>% dplyr::select(umap_3)
+#KaZhouAll = AddMetaData(KaZhouAll, UMAP_1, "UMAP_1")
+#KaZhouAll = AddMetaData(KaZhouAll, UMAP_2, "UMAP_2")
+#KaZhouAll = AddMetaData(KaZhouAll, UMAP_3, "UMAP_3")
+
+#Assign Discrete Clusters 
+Ependymal = subset(KaZhouAll_UMAP, KaZhouAll_UMAP$UMAP_1 < 3 & KaZhouAll_UMAP$UMAP_1 > -4 & KaZhouAll_UMAP$UMAP_2 < -6)
+Endothelial = subset(KaZhouAll_UMAP, KaZhouAll_UMAP$UMAP_1 < 6 & KaZhouAll_UMAP$UMAP_1 > 3 & KaZhouAll_UMAP$UMAP_2 < -7)
+KaZhouAll_V2 = subset(KaZhouAll, cells = c(row.names(Ependymal), row.names(Endothelial)), invert=T)
+
+CheckInput = Endothelial
+CheckUMAP(KaZhouAll)
+
+set.dim = 30
+set.res = 1
+set.kparam = 400
+#ClusterFunc_All_RNA(KaZhouAll_V2)
+
+DefaultAssay(KaZhouAll_V2) = "integrated"
+KaZhouAll_V2 <- FindNeighbors(KaZhouAll_V2, k.param=400, dims=1:30)
+KaZhouAll_V2 <- FindClusters(KaZhouAll_V2, resolution = 1)
+
+Neuronal = subset(KaZhouAll_V2, idents = c(0,2,7,21,19))
+Astrocytes = subset(KaZhouAll_V2, idents = c(4))
+RadialGlia = subset(KaZhouAll_V2, idents = c(1, 18,22))
+Oligodendrocytes = subset(KaZhouAll_V2, idents = c(5, 13, 17))
+Microglia = subset(KaZhouAll_V2, idents = c(6, 20, 23))
+Dividing = subset(KaZhouAll_V2, idents = c(9, 11))
+ToSplit = subset(KaZhouAll_V2, idents = c(3,8))
+Progenitor = subset(KaZhouAll_V2, idents = 10)
+Tanycytes = subset(KaZhouAll_V2, idents = 12)
+Blood = subset(KaZhouAll_V2, idents = c(14))
+VLMC = subset(KaZhouAll_V2, idents = c(15))
+Mural = subset(KaZhouAll_V2, idents = c(16))
+
+
+set.dim = 30
+set.res = 1
+set.kparam = 500
+#ClusterFunc_All_RNA(ToSplit)
+#ClusterFunc_All_RNA(Progenitor)
+
+DefaultAssay(Progenitor) = "integrated"
+Progenitor <- FindNeighbors(Progenitor, k.param=100, dims=1:30)
+Progenitor <- FindClusters(Progenitor, resolution = 1)
+Neuronal_Extras = subset(Progenitor, idents = c(0))
+IPcells = subset(Progenitor, idents = c(0), invert=T)
+
+DefaultAssay(ToSplit) = "integrated"
+ToSplit <- FindNeighbors(ToSplit, k.param=500, dims=1:30)
+ToSplit <- FindClusters(ToSplit, resolution = 1)
+NeuronalProgenitors_2 = subset(ToSplit, idents = c(0))
+Neuronal_Extras2 =  subset(ToSplit, idents = c(1, 3))
+Neuroepithelial = subset(ToSplit, idents = c(0, 1, 3), invert=T)
+Neuronal_V2 = subset(KaZhouAll_V2, cells = c(colnames(Neuronal_Extras2), colnames(Neuronal_Extras), colnames(Neuronal)))
+
+InitialCellAssignments = GenerateMetaData(list("Ependymal" = Ependymal, "Endothelial" = Endothelial, "Neuronal" = Neuronal_V2, "Astrocytes" = Astrocytes, "Oligodendrocytes" = Oligodendrocytes, "Microglia" = Microglia, "Dividing" = Dividing, "Neuroepithelial" = Neuroepithelial,  "Tanycytes" = Tanycytes, "Blood" = Blood, "VLMC" = VLMC, "Mural" = Mural, "RadialGlia" = RadialGlia, "IntProgen" = IPcells,  "NeuronalProgenitors" = NeuronalProgenitors_2))
+KaZhouAll = AddMetaData(KaZhouAll, InitialCellAssignments, "InitialCellAssignments")
+InitialCellAssignments_3D = merge(InitialCellAssignments, KaZhou_3D, by.x = 0, by.y = "X")
+p = plot_ly(InitialCellAssignments_3D, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("~/CheckOverlap_initial.html", sep=""))
+
+
+
+
+#### Cleaning Assignments #### 
+#Ependymal & VLMC is fine
+Endothelial_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Endothelial" & InitialCellAssignments_3D$umap_2 < -1 & InitialCellAssignments_3D$umap_3 < -5)
+Neurons_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Neuronal" & InitialCellAssignments_3D$umap_1 > -2 & InitialCellAssignments_3D$umap_2 > -2 & InitialCellAssignments_3D$umap_3 < 2)
+NP2_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "NeuronalProgenitors" & InitialCellAssignments_3D$umap_1 > -2 & InitialCellAssignments_3D$umap_2 > -2 & InitialCellAssignments_3D$umap_3 < 2)
+Astrocytes_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Astrocytes" & InitialCellAssignments_3D$umap_1 > -4 & InitialCellAssignments_3D$umap_2 > -5 & InitialCellAssignments_3D$umap_3 > 1)
+RadialGlia_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "RadialGlia" & InitialCellAssignments_3D$umap_1 > -4 & InitialCellAssignments_3D$umap_2 > -5 & InitialCellAssignments_3D$umap_3 > 1)
+Oligodendrocytes_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Oligodendrocytes" & InitialCellAssignments_3D$umap_2 < -4 & InitialCellAssignments_3D$umap_3 < 5 & InitialCellAssignments_3D$umap_3 > -5)
+Microglia_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Microglia" & InitialCellAssignments_3D$umap_1 < -5 & InitialCellAssignments_3D$umap_2 > -5)
+Dividing_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Dividing" & InitialCellAssignments_3D$umap_1 > -6 & InitialCellAssignments_3D$umap_1 < 2 & InitialCellAssignments_3D$umap_2 > -6 & InitialCellAssignments_3D$umap_2 < 1 & InitialCellAssignments_3D$umap_3 > -0.5 & InitialCellAssignments_3D$umap_3 < 6)
+
+Neuroepithelial_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Neuroepithelial" & InitialCellAssignments_3D$umap_1 > -8 & InitialCellAssignments_3D$umap_1 < 0 & InitialCellAssignments_3D$umap_2 > -2 & InitialCellAssignments_3D$umap_2 < 3 & InitialCellAssignments_3D$umap_3 > -2.5 & InitialCellAssignments_3D$umap_3 < 3)
+IntProgenitors_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "IntProgen" & InitialCellAssignments_3D$umap_1 > -0 )
+Tanycytes_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Tanycytes" & InitialCellAssignments_3D$umap_1 > -2 & InitialCellAssignments_3D$umap_3 > 2 & InitialCellAssignments_3D$umap_3 < 8)
+Blood_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Blood" & InitialCellAssignments_3D$umap_1 < 0  & InitialCellAssignments_3D$umap_1 > -7  & InitialCellAssignments_3D$umap_2 > 1 & InitialCellAssignments_3D$umap_3 < -1)
+Mural_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Mural" & InitialCellAssignments_3D$umap_2 > 1)
+
+
+#### Reassigning messy cells #### 
+KaZhouAll_Unassigned = subset(KaZhouAll, cells =c(Endothelial_Clean$Row.names, Neurons_Clean$Row.names, Astrocytes_Clean$Row.names, RadialGlia_Clean$Row.names, Oligodendrocytes_Clean$Row.names, Microglia_Clean$Row.names, Dividing_Clean$Row.names, Neuroepithelial_Clean$Row.names, IntProgenitors_Clean$Row.names,NP2_Clean$Row.names,  Tanycytes_Clean$Row.names, Blood_Clean$Row.names, Mural_Clean$Row.names, row.names(Ependymal), colnames(VLMC)), invert=T) #,
+KaZhouAll_Unassigned_3D = subset(KaZhou_3D, KaZhou_3D$X %in% colnames(KaZhouAll_Unassigned))
+
+InitialCellAssignments_wUnassigned = InitialCellAssignments_3D
+InitialCellAssignments_wUnassigned$Pop = ifelse(InitialCellAssignments_3D$Row.names %in% colnames(KaZhouAll_Unassigned), "Reassigned", InitialCellAssignments_3D$Pop)
+p = plot_ly(InitialCellAssignments_wUnassigned, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("./CheckOverlap_Reassigned.html", sep=""))
+
+
+Astrocytes_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > -1.5 & KaZhouAll_Unassigned_3D$umap_2 > -5  & KaZhouAll_Unassigned_3D$umap_2 < -2 & KaZhouAll_Unassigned_3D$umap_3 > 2.5)
+RadialGlial_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > -1.5 & KaZhouAll_Unassigned_3D$umap_2 > -2  & KaZhouAll_Unassigned_3D$umap_2 < 3.5 & KaZhouAll_Unassigned_3D$umap_3 > 2.5)
+Neurons_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 0.5 & KaZhouAll_Unassigned_3D$umap_2 > -2 & KaZhouAll_Unassigned_3D$umap_3 < 2)
+NP2_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > -2 & KaZhouAll_Unassigned_3D$umap_1 < 0 & KaZhouAll_Unassigned_3D$umap_2 > -2 & KaZhouAll_Unassigned_3D$umap_3 < 2)
+Oligodendrocytes_Reassigned = subset(KaZhouAll_Unassigned_3D,  KaZhouAll_Unassigned_3D$umap_2 < -4 & KaZhouAll_Unassigned_3D$umap_3 > -6 & KaZhouAll_Unassigned_3D$umap_3 < 5)
+Endothelial_Reassigned = subset(KaZhouAll_Unassigned_3D,   KaZhouAll_Unassigned_3D$umap_2 < -4 & KaZhouAll_Unassigned_3D$umap_3 < -6)
+Microglia_Reassigned = subset(KaZhouAll_Unassigned_3D,  KaZhouAll_Unassigned_3D$umap_1 < -5 & KaZhouAll_Unassigned_3D$umap_2 > -5 & KaZhouAll_Unassigned_3D$umap_2 < 2)
+Mural_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 < -4.5 & KaZhouAll_Unassigned_3D$umap_1 > -7 & KaZhouAll_Unassigned_3D$umap_2 > 1 & KaZhouAll_Unassigned_3D$umap_3 > -3 & KaZhouAll_Unassigned_3D$umap_3 < 2)
+Blood_Reassigned = subset(KaZhouAll_Unassigned_3D,  KaZhouAll_Unassigned_3D$umap_1 < 0  & KaZhouAll_Unassigned_3D$umap_1 > -3  & KaZhouAll_Unassigned_3D$umap_2 > 1 & KaZhouAll_Unassigned_3D$umap_3 < -2 | KaZhouAll_Unassigned_3D$umap_1 < -3  & KaZhouAll_Unassigned_3D$umap_1 > -7  & KaZhouAll_Unassigned_3D$umap_2 > 1 & KaZhouAll_Unassigned_3D$umap_3 < -5 )
+Tanycytes_Reassigned = subset(KaZhouAll_Unassigned_3D, ! KaZhouAll_Unassigned_3D$X %in% Astrocytes_Reassigned$X & KaZhouAll_Unassigned_3D$umap_1 > -2 &  KaZhouAll_Unassigned_3D$umap_1 < 2.5 & KaZhouAll_Unassigned_3D$umap_2 0.5 & KaZhouAll_Unassigned_3D$umap_3 > 3 & KaZhouAll_Unassigned_3D$umap_3 < 8)
+Neuroepithelial_Reassigned = subset(KaZhouAll_Unassigned_3D, ! KaZhouAll_Unassigned_3D$X %in% c(Neurons_Reassigned$X, Microglia_Reassigned$X, Mural_Reassigned$X) &  KaZhouAll_Unassigned_3D$umap_1 > -8 & KaZhouAll_Unassigned_3D$umap_1 < -0.5 & KaZhouAll_Unassigned_3D$umap_2 > -2 & KaZhouAll_Unassigned_3D$umap_2 < 3 & KaZhouAll_Unassigned_3D$umap_3 > -2.5 & KaZhouAll_Unassigned_3D$umap_3 < 3)
+Dividing_Reassigned = subset(KaZhouAll_Unassigned_3D,  ! KaZhouAll_Unassigned_3D$X %in%  c(Astrocytes_Reassigned$X, Neurons_Reassigned$X, Oligodendrocytes_Reassigned$X, Microglia_Reassigned$X, Neuroepithelial_Reassigned$X) & KaZhouAll_Unassigned_3D$umap_1 > -6 & KaZhouAll_Unassigned_3D$umap_1 < 1 & KaZhouAll_Unassigned_3D$umap_2 > -6 & KaZhouAll_Unassigned_3D$umap_2 < 1 & KaZhouAll_Unassigned_3D$umap_3 > -1 & KaZhouAll_Unassigned_3D$umap_3 < 6)
+NeuronalProgenitors_Reassigned = subset(KaZhouAll_Unassigned_3D, ! KaZhouAll_Unassigned_3D$X %in%  c(Astrocytes_Reassigned$X, Neurons_Reassigned$X, Oligodendrocytes_Reassigned$X, Dividing_Reassigned$X) & KaZhouAll_Unassigned_3D$umap_1 > -0 & KaZhouAll_Unassigned_3D$umap_1 < 3.5 & KaZhouAll_Unassigned_3D$umap_2 > -5 & KaZhouAll_Unassigned_3D$umap_2 < 1.2 & KaZhouAll_Unassigned_3D$umap_3 > -2 & KaZhouAll_Unassigned_3D$umap_3 < 4 )
+
+InitialCellAssignments_wUnassigned2 = InitialCellAssignments_wUnassigned
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Astrocytes_Reassigned$X, "Astrocytes", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% RadialGlial_Reassigned$X, "RadialGlia", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Neurons_Reassigned$X, "Neuronal", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% NP2_Reassigned$X, "NeuronalProgenitors", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Oligodendrocytes_Reassigned$X, "Oligodendrocytes", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Endothelial_Reassigned$X, "Endothelial", InitialCellAssignments_wUnassigned2$Pop)
+
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Microglia_Reassigned$X, "Microglia", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Mural_Reassigned$X, "Mural", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Blood_Reassigned$X, "Blood", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Tanycytes_Reassigned$X, "Tanycytes", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Neuroepithelial_Reassigned$X, "Neuroepithelial", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Dividing_Reassigned$X, "Dividing", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% IntProgenitors_Clean$X, "IntProgen", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Pop %in% "Ependymal" & InitialCellAssignments_wUnassigned2$umap_3 < 0, "Neuronal", InitialCellAssignments_wUnassigned2$Pop)
+
+Unassigned3 = subset(InitialCellAssignments_wUnassigned2, InitialCellAssignments_wUnassigned2$Pop %in% "Reassigned")
+Blood_Extra = subset(Unassigned3, Unassigned3$umap_3 < -4)
+VLMC_Extra = subset(Unassigned3, Unassigned3$umap_3 > -4 & Unassigned3$umap_1 < -2) 
+NE_Extra = subset(Unassigned3, Unassigned3$umap_3 > -4 & Unassigned3$umap_1 > -2)
+
+
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Blood_Extra$Row.names, "Blood", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% VLMC_Extra$Row.names, "VLMC", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% NE_Extra$Row.names, "Neuroepithelial", InitialCellAssignments_wUnassigned2$Pop)
+
+p = plot_ly(InitialCellAssignments_wUnassigned2, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("~/CheckOverlap_Reassigned2.html", sep=""))
+
+FirstpassClustering = InitialCellAssignments_wUnassigned2
+write.csv(FirstpassClustering, "FirstpassClustering.csv")
+
+
+
+#### More detailed clustering of relevant cell popualation #### 
+#Oligodendrocytes
+OLIG = subset(FirstpassClustering, FirstpassClustering$Pop %in% "Oligodendrocytes")
+OLIG_Seu = subset(KaZhouAll, cells = OLIG$Row.names)
+set.dim = 30
+set.res = 1
+set.kparam = 500
+#ClusterFunc_All_RNA(OLIG_Seu) 
+
+DefaultAssay(OLIG_Seu) = "integrated"
+OligCheck1 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 < 0 & KaZhouAll_UMAP$UMAP_2 < 0)
+OligCheck2 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 0.5 & KaZhouAll_UMAP$UMAP_2 < 0)
+OligCheck3 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 < 0 & KaZhouAll_UMAP$UMAP_2 0.5 & KaZhouAll_UMAP$UMAP_2 < 7)
+OligCheck4 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 0.5 & KaZhouAll_UMAP$UMAP_2 0.5 & KaZhouAll_UMAP$UMAP_2 < 8)
+OligCheck5 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 > 3 &  KaZhouAll_UMAP$UMAP_2 > 10.5 & KaZhouAll_UMAP$UMAP_2 < 14)
+
+OLIG_Seu2 = subset(OLIG_Seu, cells = c(row.names(OligCheck1), row.names(OligCheck2), row.names(OligCheck3), row.names(OligCheck4), row.names(OligCheck5)), invert=T)
+
+
+set.dim = 30
+set.res = 1
+set.kparam = 400
+#ClusterFunc_All_RNA(OLIG_Seu2) 
+DefaultAssay(OLIG_Seu2)= "integrated"
+OLIG_Seu2 <- FindNeighbors(OLIG_Seu2, k.param=500, dims=1:30)
+OLIG_Seu2 <- FindClusters(OLIG_Seu2, resolution = 1)
+OLIG_Dividing = subset(OLIG_Seu2, idents = c(4))
+OLIG_Immature = subset(OLIG_Seu2, idents = c(0))
+OLIG_Intermediate = subset(OLIG_Seu2, idents = c(3,5))
+OLIG_Mature = subset(OLIG_Seu2, idents = c(2))
+OLIG_ToSplit = subset(OLIG_Seu2, idents = c(1))
+
+OLIG_Immature_Extras = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_ToSplit) & KaZhouAll_UMAP$UMAP_2 < 12)
+OLIG_Mature_Extras = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_ToSplit) & KaZhouAll_UMAP$UMAP_2 > 12)
+
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck1), colnames(OLIG_Intermediate)), "Oligodendrocytes [Intermediate]", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck2), colnames(OLIG_Mature), row.names(OLIG_Mature_Extras)), "Oligodendrocytes [Mature]", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(colnames(OLIG_Immature), row.names(OLIG_Immature_Extras)), "Oligodendrocytes [Immature]", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck3)), "IntProgen", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% row.names(OligCheck5), "Neuroepithelial", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck4), colnames(OLIG_Dividing)), "Oligodendrocytes [Dividing]", FirstpassClustering$Pop)
+
+
+p = plot_ly(FirstpassClustering, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("./CheckOverlap_Reassigned3.html", sep=""))
+
+
+#Mural
+
+Mural_2 = subset(FirstpassClustering, FirstpassClustering$Pop %in% "Mural")
+Mural_2_Seu = subset(KaZhouAll, cells = Mural_2$Row.names)
+set.dim = 30
+set.res = 1
+set.kparam = c(5 )
+#ClusterFunc_All_RNA(Mural_2_Seu)
+DefaultAssay(Mural_2_Seu)= "integrated"
+Mural_2_Seu <- FindNeighbors(Mural_2_Seu, k.param=20, dims=1:30)
+Mural_2_Seu <- FindClusters(Mural_2_Seu, resolution = 1)
+vSMC = subset(Mural_2_Seu, idents = c(4))
+Pericytes = subset(Mural_2_Seu, idents = c(4), invert=T)
+
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% colnames(Pericytes), "Pericytes", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% colnames(vSMC), "vSMC", FirstpassClustering$Pop)
+
+
+IntProg = subset(FirstpassClustering, FirstpassClustering$Pop %in% "IntProgen")
+IntProgSeu = subset(KaZhouAll, cells = IntProg$Row.names)
+set.dim = 30
+set.res = 1
+set.kparam = c(50)
+#ClusterFunc_All_RNA(NeurProgSeu)
+
+DefaultAssay(IntProgSeu)= "integrated"
+IntProgSeu <- FindNeighbors(IntProgSeu, k.param=50, dims=1:30)
+IntProgSeu <- FindClusters(IntProgSeu, resolution = 1)
+Neuronal_Extras3 = subset(IntProgSeu, idents = c(2,3))
+IPCs = subset(IntProgSeu, idents = c(2,3), invert=T)
+
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(colnames(IPCs)), "IntProgen", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% colnames(Neuronal_Extras3), "Neuronal", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Pop %in% "Ependymal" & FirstpassClustering$umap_3 < 0, "Neuronal", CleanedClusters_Figure1$Pop)
+
+FirstpassClustering$Pop = gsub("NeuronalProgenitors", "Neuroepithelial", FirstpassClustering$Pop)
+CleanedClusters_Figure1 = FirstpassClustering
+
+p = plot_ly(CleanedClusters_Figure1, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("~/CheckOverlap_Reassigned2.html", sep=""))
+write.csv(CleanedClusters_Figure1, "CleanedClusters_Figure1_19DEC22.csv")
+
+save(list = (c("KaZhouAll", "InitialCellAssignments_3D", "InitialCellAssignments", "KaZhouAll_UMAP", "KaZhou_3D", "CleanedClusters_Figure1")), file = paste(FilePath, "Hypo_SciAdv_Fig1.RData", sep=""))
+
+```
+
+#FIG1-PLOTS
+```{r FIG1-PLOTS}
+#FilePath = "~/Library/CloudStorage/Box-Box/HG2553 Personal Folder/Science Advances/"
+KaZhouAll = readRDS("~/Downloads/KaZhouAll_mt10_integrated.rds")
+CleanedClusters_Figure1 = read.csv("~/Downloads/CleanedClusters_Figure1_19DEC22.csv", row.names =1)
+
+
+PopOrder = c("Neuroepithelial", "Dividing", "RadialGlia", "IntProgen", "Oligodendrocytes [Dividing]",  "Oligodendrocytes [Immature]", "Oligodendrocytes [Intermediate]",  "Oligodendrocytes [Mature]","NeuronalProgenitors",  "Neuronal", "Astrocytes", "Ependymal", "Tanycytes", "Microglia",   "Pericytes", "vSMC",  "VLMC",   "Endothelial",  "Blood")
+
+colnames(CleanedClusters_Figure1) = c("Row.names", "Pop", "UMAP_1", "UMAP_2", "UMAP_3")
+CleanedClusters_Figure1_Meta = merge(CleanedClusters_Figure1, KaZhouAll@meta.data, by.x = "Row.names", by.y = 0)
+
+
+CleanedClusters_Figure1_Meta$Timepoint = gsub("_.*", "", gsub("T", "", gsub("CS13", "GW6", gsub("CS14", "GW7", gsub("CS15",  "GW7", gsub("CS22", "GW10",  CleanedClusters_Figure1_Meta$sample))))))
+
+
+CleanedClusters_Figure1_Meta$Timepoint2 = ifelse(CleanedClusters_Figure1_Meta$Study == "Zhou", paste(CleanedClusters_Figure1_Meta$Timepoint, "[Zhou]"), CleanedClusters_Figure1_Meta$Timepoint)
+
+CleanedClusters_Figure1_Meta$Timepoint = factor(CleanedClusters_Figure1_Meta$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25" ))
+CleanedClusters_Figure1_Meta$Timepoint2 = factor(CleanedClusters_Figure1_Meta$Timepoint2, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+
+CleanedClusters_Figure1_Meta$count = 1
+SupTable1 = CleanedClusters_Figure1_Meta %>% group_by(Timepoint2) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTable1, "SciAdv_SupTable1.csv", row.names = F)
+
+############## FIGURE 1B ##############
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, size = 1, color = ~Timepoint, colors = TimepointColors_Fetal)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1_3D_BySample.html", sep=""))
+
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, size = 1, color = ~Timepoint2, colors = TimepointColors_FetalZhou)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1Supp_3D_BySampleStudy.html", sep=""))
+
+############## FIGURE 1C ############## 
+
+CleanedClusters_Figure1_Meta$Pop = factor(CleanedClusters_Figure1_Meta$Pop, levels = PopOrder)
+CleanedClusters_Figure1_Meta = CleanedClusters_Figure1_Meta[order(CleanedClusters_Figure1_Meta$Pop), ]
+
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, size = 1, color = ~Pop, colors = CellPopColors, type="scatter3d")
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1_3D_AllAssignments.html", sep=""))
+
+############## SUPP FIG 1 ##############
+KaZhouAll@meta.data$Timepoint = gsub("_.*", "", gsub("T", "", gsub("CS13", "GW6", gsub("CS14", "GW7", gsub("CS15",  "GW7", gsub("CS22", "GW10",  KaZhouAll@meta.data$sample))))))
+KaZhouAll@meta.data$Timepoint2 = ifelse(KaZhouAll@meta.data$Study == "Zhou", paste(KaZhouAll@meta.data$Timepoint, "[Zhou]"), KaZhouAll@meta.data$Timepoint)
+
+Fig1Assignments = CleanedClusters_Figure1_Meta %>% dplyr::select(Pop)
+row.names(Fig1Assignments) = CleanedClusters_Figure1_Meta$Row.names
+Fig1Assignments$Pop = factor(Fig1Assignments$Pop, levels = PopOrder)
+KaZhouAll@meta.data$Timepoint2 = factor(KaZhouAll@meta.data$Timepoint2, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+
+Plot = list()
+KaZhouAll = AddMetaData(KaZhouAll, Fig1Assignments, "Fig1Assignments")
+for(x in unique(KaZhouAll@meta.data$Timepoint2)){
+Idents(KaZhouAll) = "Timepoint2"
+Subs = subset(KaZhouAll, idents = x)  
+Idents(Subs) = "Fig1Assignments"
+
+Plot[[x]] = DimPlot(Subs,  cols = CellPopColors, raster=F) + xlim(-10, 16) + ylim(-12, 16)+theme(axis.title = element_blank(), axis.ticks = element_line(color = "lightgrey"), axis.text = element_blank(), axis.line  = element_line(color = "lightgrey")) +NoLegend()
+}
+Combined = ggarrange(plotlist = Plot, ncol = 4, nrow=4)
+
+pdf(paste(FilePath, "Fig1Supp_SamplesSplit.pdf", sep=""), width = 10, height = 10)
+print(Combined)
+dev.off()
+
+############## FIGURE 1D ############## 
+
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "Timepoint")
+for(x in unique(CleanedClusters_Figure1_Meta$Timepoint)){
+Subs= subset(CleanedClusters_Figure1_Meta, CleanedClusters_Figure1_Meta$Timepoint == x) 
+MetaTable = as.data.frame(table(Subs$Pop))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$Timepoint = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents2 = merge(CompilePercents, CellPopColors, by.x = "Var1", by.y = 0)
+CompilePercents2$Var1 = factor(CompilePercents2$Var1, levels = rev(PopOrder))
+CompilePercents2$Timepoint = factor(CompilePercents2$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25"))
+  
+StackedPlot = ggplot(CompilePercents2, aes(fill=Var1, y=Percent, x=Timepoint)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text = element_text(size = 12), axis.title.y = element_text(size = 12), legend.title = element_blank()) + scale_fill_manual(values = CellPopColors)
+
+
+pdf(paste(FilePath, "Fetal_ForPaper_StackedbyPercent.pdf", sep=""), width = 8, height = 2.8)
+print(StackedPlot)
+dev.off()
+
+############## SUPP FIGURE ############## 
+
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "Timepoint2")
+for(x in unique(CleanedClusters_Figure1_Meta$Timepoint2)){
+Subs= subset(CleanedClusters_Figure1_Meta, CleanedClusters_Figure1_Meta$Timepoint2 == x) 
+MetaTable = as.data.frame(table(Subs$Pop))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$Timepoint2 = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents$Var1 = factor(CompilePercents$Var1, levels = rev(PopOrder))
+CompilePercents$Timepoint = factor(CompilePercents$Timepoint, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+  
+StackedPlot = ggplot(CompilePercents, aes(fill=Var1, y=Percent, x=Timepoint)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text = element_text(size = 12), axis.title.y = element_text(size = 12), legend.title = element_blank()) + scale_fill_manual(values = CellPopColors)
+
+pdf(paste(FilePath, "Fetal_ForPaper_Supp_StackedbyPercent_13DEC22.pdf", sep=""), width = 8, height = 2.8)
+print(StackedPlot)
+dev.off()
+
+
+############## FIGURE 1H ############## 
+Fig1Assignments = CleanedClusters_Figure1_Meta %>% dplyr::select(Pop)
+row.names(Fig1Assignments) = CleanedClusters_Figure1_Meta$Row.names
+Fig1Assignments$Pop = factor(Fig1Assignments$Pop, levels = rev(PopOrder))
+KaZhouAll = AddMetaData(KaZhouAll, Fig1Assignments, "Fig1Assignments")
+Idents(KaZhouAll) = "Fig1Assignments"
+DefaultAssay(KaZhouAll) = "RNA"
+DP = Seurat::DotPlot(KaZhouAll, assay = "RNA", features= c("HMGA2", "ARHGAP28", "MKI67","NES", "FABP7", "TTYH1", "SLC1A3",  "ASCL1", "EGFR", "OLIG1","OLIG2","APOD","PDGFRA",  "MBP", "PLP1", "MAG", "MOG", "STMN2", "SYT1", "GJA1", "GFAP", "AQP4", "ALDOC", "SLC1A2",  "CCDC153",  "CRYM", "C1QB", "AIF1", "RGS5",  "KCNJ8", "ABCC9", "ACTA2", "TAGLN", "LUM", "DCN", "COL1A1",  "PDGFRB", "CLDN5", "ITM2A", "FLT1", "HBA2"),  cols = c("#FFFFFF", HeatmapBlue), dot.min = 0.15) + theme(axis.text.x = element_text(size=10, face="italic", angle = 90, vjust = 0.5, hjust=1), axis.text.y = element_text(size=10), legend.title = element_text(size=8)) + ylab("")
+
+
+pdf(paste(FilePath, "Fetal_ForPaper_Fig1DotPlot.pdf", sep=""), width = 15, height = 5)
+print(DP)
+dev.off()
+
+
+KaZhouAll@meta.data$count = 1
+SupTable4 = KaZhouAll@meta.data %>% group_by(Fig1Assignments) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+SupTable4$Fig1Assignments = factor(SupTable4$Fig1Assignments, levels = PopOrder)
+SupTable4 = SupTable4[order(SupTable4$Fig1Assignments), ]
+write.csv(SupTable4, "SciAdv_SupTable4.csv", row.names = F)
+```
+
+#FIG2-GENERATE-TRAJECTORIES
+```{r F2:TRAJECT}
+EdKaZhouHypoNeurons = readRDS("~/Downloads/EdKaZhouHypoNeurons_mt10_integrated.rds")
+set.seed(100)
+EdKaZhouHypoNeurons@meta.data$SampleBroad = gsub("_.*", "", gsub("22T", "22", gsub("CS22", "GW10", EdKaZhouHypoNeurons@meta.data$sample)))
+EdKaZhouHypoNeurons@meta.data$SampleBroad = ifelse(EdKaZhouHypoNeurons@meta.data$SampleBroad %in% c("10X190", "10X192", "10X193", "10X203", "10X360", "10X362", "10X376", "10X380", "10X389", "10X392"), EdKaZhouHypoNeurons@meta.data$Roi, EdKaZhouHypoNeurons@meta.data$SampleBroad)
+EdKaZhouHypoNeurons@meta.data$SampleBroad = gsub("\\<Human HTHma\\>", "Adult_MN", gsub("\\<Human HTHma-HTHtub\\>", "Adult_TUB/MN", gsub("\\<Human HTHpo\\>", "Adult_PO", gsub("\\<Human HTHpo-HTHso\\>", "Adult_PO/SO", gsub("\\<Human HTHso\\>", "Adult_SO", gsub("\\<Human HTHso-HTHtub\\>", "Adult_SO/TUB", gsub("\\<Human HTHtub\\>", "Adult_TUB", gsub("\\<Human MN\\>", "Adult_MN", EdKaZhouHypoNeurons@meta.data$SampleBroad))))))))
+EdKaZhouHypoNeurons@meta.data$SampleAdult = gsub("_.*", "", EdKaZhouHypoNeurons@meta.data$SampleBroad)
+Timepoints = EdKaZhouHypoNeurons@meta.data %>% dplyr::select(SampleBroad)
+
+EdKaZhouHypoNeurons@meta.data$SampleDissect = ifelse(is.na(EdKaZhouHypoNeurons@meta.data$Age) == T, EdKaZhouHypoNeurons@meta.data$SampleBroad, paste(EdKaZhouHypoNeurons@meta.data$Age,"YO_", EdKaZhouHypoNeurons@meta.data$SampleBroad, sep=""))
+  
+  
+EdKaZhouHypoNeurons@meta.data$count = 1
+SupTable5 = EdKaZhouHypoNeurons@meta.data %>% group_by(SampleDissect) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTable5, "SciAdv_SupTable5.csv", row.names = F)
+
+
+
+GeneList = c(  "SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1",  "SLC17A6", "SLC17A8", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SIM1", "POU3F2",  "NHLH2", "MC4R", "OXT", "AVP", "CRH", "GAL", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "PITX2", "FOXP1", "FOXP2", "FOXB1", "SOX14",  "FEZF2", "LHX1", "HCRT", "CARTPT", "PMCH", "LHX2", "LHX9", "PDYN", "RGS16","LHX1", "GRP", "VIP", "CCK", "VAX1", "SIX3", "SIX6" , "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5", "PPP1R17", "NKX2-2", "LHX8", "NR2F1", "NR2F2", "HMX3", "RELN", "MEIS2", "ARX", "LHX6", "PRDM8")
+
+Dimensions = data.frame(PCA = c(20), UMAP = c(20), spread = c(3), kval = c(100))
+StartTime = "GW10"
+SeuName = "Fig2_Trajectories_"
+
+
+x =1
+#for(x in 1:dim(Dimensions)[1]){
+PullDim = subset(Dimensions, row.names(Dimensions) %in% x)
+get.PCs = PullDim[[1]]
+get.UMAPs = PullDim[[2]]
+get.spread = PullDim[[3]]
+get.kval = PullDim[[4]]
+
+Filename = paste(SeuName, "_",get.PCs,"_",get.UMAPs, "_", get.spread, sep="")
+DefaultAssay(EdKaZhouHypoNeurons) = "integrated"
+EdKaZhouHypoNeurons = RunPCA(EdKaZhouHypoNeurons, npcs = get.PCs)
+EdKaZhouHypoNeurons <- RunUMAP(EdKaZhouHypoNeurons, dims = 1:get.UMAPs, spread= get.spread, n.components = 3)
+DefaultAssay(EdKaZhouHypoNeurons) = "RNA"
+
+### monocle 3
+dir.create(file.path( Filename))
+geneMeta = data.frame(gene_short_name=rownames(EdKaZhouHypoNeurons))    
+rownames(geneMeta) = rownames(EdKaZhouHypoNeurons)
+DefaultAssay(EdKaZhouHypoNeurons) = 'integrated' 
+M3Seu <- new_cell_data_set(EdKaZhouHypoNeurons@assays$RNA@counts,cell_metadata = EdKaZhouHypoNeurons@meta.data, gene_metadata = geneMeta)
+M3Seu <- preprocess_cds(M3Seu, num_dim = get.PCs)
+M3Seu <- reduce_dimension(M3Seu)
+M3Seu@reduce_dim_aux$gene_loadings = EdKaZhouHypoNeurons@reductions[["pca"]]@feature.loadings[,1:get.PCs]
+reducedDims(M3Seu)[['UMAP']] = EdKaZhouHypoNeurons@reductions[["umap"]]@cell.embeddings ## from code - UMAP by cell 
+kval = get.kval
+dir.create(file.path(Filename, paste("KVal", kval, sep="")))
+M3Seu <- cluster_cells(M3Seu,reduction_method = "UMAP", k = kval)
+M3Seu <- learn_graph(M3Seu)
+
+Pull = as.data.frame(paste('Y_',M3Seu@principal_graph_aux[['UMAP']]$pr_graph_cell_proj_closest_vertex[,1],sep=''))
+row.names(Pull) = colnames(M3Seu)
+colnames(Pull) = "Vertex"
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, Pull, "Vertex")
+Pull2 = merge(Pull, Timepoints, by = 0)
+
+Pull2$Val = 1
+Pull_n = as.data.frame(table(Pull2$SampleBroad))
+Pull3 = Pull2 %>% dplyr::group_by(Vertex, SampleBroad) %>% dplyr::summarise(n_ = sum(Val, na.rm=T))
+Pull4 = as.data.frame(table(Pull2$Vertex))
+Pull5 = merge(Pull3, Pull4, by.x = "Vertex", by.y = "Var1")
+Pull5$Percent = Pull5$n_/Pull5$Freq
+PullCS22 = subset(Pull5, Pull5$SampleBroad == StartTime & Pull5$Freq > 20)
+PullCS22 = PullCS22[order(-PullCS22$Percent), ]
+
+OUTS = as.data.frame(M3Seu@clusters$UMAP$partitions)
+OUTS2 = merge(OUTS, Pull, by = 0)
+OUTS3 = as.data.frame(table(OUTS2$`M3Seu@clusters$UMAP$partitions`))
+OUTS3$Perc = OUTS3$Freq/ dim(OUTS)[1]
+OUTS4 = subset(OUTS3, OUTS3$Perc > 0.4)
+OUTS5 = subset(OUTS2, OUTS2$`M3Seu@clusters$UMAP$partitions` == 1)
+
+Vertexes = subset(PullCS22, PullCS22$Vertex %in% OUTS5$Vertex)
+if(dim(OUTS4)[1] <= 0.5){
+BadPartitions =  0
+write.csv(BadPartitions, paste(Filename, "/KVal", kval,  "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "BADPARTITIONS.csv", sep=""))
+}
+#if(dim(OUTS4)[1] == 1){
+t = 1
+#for(t in seq(1,3,1)){
+Pull6 = subset(Pull, Pull$Vertex %in% Vertexes[[1]][t])
+M3SeuNODE = M3Seu
+M3SeuNODE <- order_cells(M3SeuNODE, root_pr_nodes=Vertexes[[1]][t])
+dir.create(file.path(paste(Filename, "/KVal", kval, sep=""), paste("Node", t, "_", Vertexes[[1]][t], sep="")))
+
+####### FIG 2B
+p = plot_cells_3d(M3SeuNODE, color_cells_by = "SampleAdult", color_palette = TimepointColors_FetalAdult)
+htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "SampleAdult.html", sep=""))
+
+####### FIG 2C
+p = plot_cells_3d(M3SeuNODE, color_cells_by = "pseudotime")
+htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "Pseudotime.html", sep=""))
+p = plot_cells_3d(M3SeuNODE,color_cells_by = "partition")
+htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "k", kval, "Partition.html", sep=""))
+
+tmpLin = M3SeuNODE@principal_graph_aux[['UMAP']]["pseudotime"][[1]]
+tmpLin[which(tmpLin==Inf)] =50
+M3SeuNODEpseu = tapply(X=tmpLin,INDEX=Pull$Vertex,FUN=mean, na.rm = TRUE)
+#M3SeuNODEpseu = tapply(X=tmpLin,INDEX=colData(M3SeuNODE)$vertex,FUN=mean, na.rm = TRUE)
+mleaves = monocle3:::leaf_nodes(M3Seu,reduction_method='UMAP') ## 48  - 
+colData(M3Seu)$MonocleLeaf = NA
+colData(M3Seu)$MonocleLeaf[colData(M3Seu)$Vertex%in%names(mleaves)] = colData(M3Seu)$Vertex[colData(M3Seu)$Vertex%in%names(mleaves)]
+p=plot_cells_3d(M3Seu,color_cells_by = "MonocleLeaf",color_palette=hue_pal()(length(unique(colData(M3Seu)$MonocleLeaf))))
+htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "MonocleLeaves.html", sep=""))
+
+
+mbranches = monocle3:::branch_nodes(M3Seu,reduction_method='UMAP') ##49
+colData(M3Seu)$MonocleBranch = NA
+colData(M3Seu)$MonocleBranch[colData(M3Seu)$Vertex%in%names(mbranches)] = colData(M3Seu)$Vertex[colData(M3Seu)$Vertex%in%names(mbranches)]
+p=plot_cells_3d(M3Seu,color_cells_by = "MonocleBranch",color_palette=hue_pal()(length(unique(colData(M3Seu)$MonocleBranch))))
+htmlwidgets::saveWidget(p, paste(Filename, "/KVal", kval,  "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "MonocleBranches.html", sep=""))
+
+
+
+colData(M3Seu)$Leaves_Branches = NA
+colData(M3Seu)$Leaves_Branches[colData(M3Seu)$Vertex%in%c(names(mleaves), names(mbranches))] = colData(M3Seu)$Vertex[colData(M3Seu)$Vertex%in%c(names(mleaves), names(mbranches))]
+
+colrange_branches <- colorRampPalette(c("#d1e3d1", "#087508")) #green
+colrange_branches_n <- colrange_branches(length(unique(mbranches)))
+colrange_branches_ndf = as.data.frame(colrange_branches_n)
+colrange_branches_ndf$Vertex = unique(mbranches)
+colnames(colrange_branches_ndf) = c("Colour", "Vertex")
+
+colrange_leaves <- colorRampPalette(c("#ffd4b3", "#f77007")) #orange
+colrange_leaves_n <- colrange_leaves(length(unique(mleaves)))
+colrange_leaves_ndf = as.data.frame(colrange_leaves_n)
+colrange_leaves_ndf$Vertex = unique(mleaves)
+colnames(colrange_leaves_ndf) = c("Colour", "Vertex")
+
+CombineColors = rbind(colrange_leaves_ndf, colrange_branches_ndf)
+CombineColors = CombineColors[order(CombineColors$Vertex), ]
+OutsColor =  CombineColors$Colour
+names(OutsColor) = paste("Y_", CombineColors$Vertex, sep="")
+
+p=plot_cells_3d(M3Seu,color_cells_by = "Leaves_Branches",color_palette=OutsColor)
+htmlwidgets::saveWidget(p, paste(Filename, "/KVal", kval,  "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval,  "MonocleLeavesandBranches.html", sep=""))
+
+rtti287m = data.frame(root=rep(Vertexes[[1]][t],length(unique(mleaves))), leaf=paste("Y_", unique(mleaves), sep=""))
+
+
+rtti287m2 = subset(rtti287m, rtti287m$leaf %in% OUTS5$Vertex)
+
+
+linksNODE = data.frame(matrix(ncol = 3, nrow = 0))
+colnames(linksNODE) = c("from", "to", "weight")
+for(i in seq(1, nrow(rtti287m2), 1)){
+FROM=rtti287m2$root[i]
+TO=rtti287m2$leaf[i]
+lins = all_simple_paths(M3Seu@principal_graph[['UMAP']],FROM,TO)
+lengs = unlist(lapply(lins,FUN=length))
+shortInd = which(lengs==min(lengs))
+if(length(lins) > 0){
+shortInd = shortInd[[1]]
+tmpLin = lins[[shortInd]]
+tmpEdge = data.frame(from = paste('Y_',as.vector(tmpLin[-length(tmpLin)]),sep=''),to=paste('Y_',as.vector(tmpLin[-1]),sep=''))
+tmpWeight = abs(M3SeuNODEpseu[tmpEdge$to] - M3SeuNODEpseu[tmpEdge$from])
+tmpEdge$weight = tmpWeight
+if(dim(linksNODE)[1]==0){
+linksNODE = tmpEdge
+} else {
+linksNODE = rbind(linksNODE,tmpEdge)
+}
+}
+
+}
+
+
+linksNODE = unique(linksNODE)
+nodesNODE = data.frame(id=unique(c(linksNODE$from,linksNODE$to)))
+nodesNODE$type = 'lineage'
+nodesNODE$type[nodesNODE$id%in%names(table(linksNODE$from)[which(table(linksNODE$from)>1)])] = 'branch' 
+nodesNODE$type[nodesNODE$id==PullCS22[[1]][t]] = 'root'
+nodesNODE$type[nodesNODE$id%in%names(table(c(linksNODE$from,linksNODE$to))[which(table(c(linksNODE$from,linksNODE$to))==1)])] = 'leaf'
+nodesNODE$type2 = 4
+nodesNODE$type2[nodesNODE$id%in%names(table(linksNODE$from)[which(table(linksNODE$from)>1)])] = 3
+nodesNODE$type2[nodesNODE$id==PullCS22[[1]][t]] = 1
+nodesNODE$type2[nodesNODE$id%in%names(table(c(linksNODE$from,linksNODE$to))[which(table(c(linksNODE$from,linksNODE$to))==1)])] = 2
+nodesNODE$rbl = nodesNODE$id
+nodesNODE$rbl[nodesNODE$type%in%'lineage']='' ## can add other columns with metadata
+net.NODE <- graph_from_data_frame(d=linksNODE, vertices=nodesNODE, directed=T)
+V(net.NODE)$size <- c(10,5,3,2)[V(net.NODE)$type2]
+V(net.NODE)$frame.color <- "white"
+V(net.NODE)$color <- c("darkgray","skyblue3","skyblue2","gray")[V(net.NODE)$type2]
+V(net.NODE)$label <- V(net.NODE)$rbl #V(net.NODE)$label <- ""
+E(net.NODE)$arrow.mode <- 0
+#Used in Fig 2E & F and supplementals
+lrt.NODE = layout.reingold.tilford(net.NODE)
+pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineage.pdf", sep=""),width=12,height=8)
+print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+dev.off()
+
+V(net.NODE)$label <- ""
+lrt.NODE = layout.reingold.tilford(net.NODE)
+pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageNoLabs.pdf", sep=""),width=12,height=8)
+print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+dev.off()
+
+#Used for assigning lineages
+V(net.NODE)$label <- V(net.NODE)$name #V(net.NODE)$label <- ""
+pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageAllLabs.pdf", sep=""),width=24,height=16)
+print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+dev.off()
+
+write.csv(nodesNODE, paste(Filename, "_k", kval, "_NodesOrder.csv", sep=""))
+
+#Used in Fig 2D and supplementals
+ind = which(OUTS5$Vertex %in%nodesNODE$id)
+for(i in c("SLC17A7", "NFIX", "SOX6")){ #GeneList
+gene = i
+tmpGene = EdKaZhouHypoNeurons@assays$RNA@counts[gene,ind]
+tmpGeneVertex = tapply(X=tmpGene,INDEX=EdKaZhouHypoNeurons@meta.data$Vertex[ind],FUN=mean)
+tmpGeneVertex2 = round(scales::rescale(tmpGeneVertex, to = c(1, 100)),0)
+fun_color_range <- colorRampPalette(c("#919191", "red"))
+my_colors <- fun_color_range(100)
+tmpGeneColors = my_colors[tmpGeneVertex2]
+names(tmpGeneColors) = names(tmpGeneVertex2)
+V(net.NODE)$color <- tmpGeneColors[as.vector(nodesNODE$id)]
+
+pdf(paste(Filename, "/KVal", kval,  "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "_ShortestPath_Lineage_", i, ".pdf", sep=""),width=12,height=8)
+print(plot(net.NODE,layout=lrt.NODE, vertex.label =NA, label = i))
+dev.off()
+}
+
+save.image(paste(Filename, "_k", kval, ".RData", sep=""))
+#}
+  
+#}
+#}
+```
+
+#FIG2-ADDITIONAL-PLOTS
+```{r}
+#################### Generating metadata and calculating percent by timepoint #################### 
+##################################### For Fig 2 vii and viii #####################################
+for(LIN in c( "6_k100", "3_k20",  "3_k100", "3_k150")){ 
+  
+NodeInfo = read.csv(paste("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "_NodesOrder_Assigned.csv", sep=""), na.strings=c("","NA"))
+
+load(paste("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, ".RData", sep=""))
+PullMeta = EdKaZhouHypoNeurons@meta.data
+PullMeta$Barcs = row.names(PullMeta)
+
+PullMeta$SampleBroad = gsub("_.*", "", gsub("22T", "22", gsub("CS22", "GW10", PullMeta$sample)))
+PullMeta$SampleBroad = ifelse(PullMeta$SampleBroad %in% c("10X190", "10X192", "10X193", "10X203", "10X360", "10X362", "10X376", "10X380", "10X389", "10X392"), PullMeta$Roi, PullMeta$SampleBroad)
+PullMeta$SampleBroad = gsub("\\<Human HTHma\\>", "Adult_MN", gsub("\\<Human HTHma-HTHtub\\>", "Adult_TUB/MN", gsub("\\<Human HTHpo\\>", "Adult_PO", gsub("\\<Human HTHpo-HTHso\\>", "Adult_PO/SO", gsub("\\<Human HTHso\\>", "Adult_SO", gsub("\\<Human HTHso-HTHtub\\>", "Adult_SO/TUB", gsub("\\<Human HTHtub\\>", "Adult_TUB", gsub("\\<Human MN\\>", "Adult_MN", PullMeta$SampleBroad))))))))
+
+
+PullMeta$SampleBroad = factor(PullMeta$SampleBroad, levels = c("GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25",  "Adult_PO", "Adult_PO/SO", "Adult_SO", "Adult_SO/TUB",   "Adult_TUB",   "Adult_TUB/MN",   "Adult_MN"))
+
+MergedNodes = merge(PullMeta, NodeInfo, by.x = "Vertex", by.y = "id")
+MergedNodes$Node = factor(MergedNodes$Node, levels = sort(unique(MergedNodes$Node)))
+#MergedNodes$Nuclei = factor(MergedNodes$Nuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "SMN", "MN", "ID"))
+
+write.csv(MergedNodes, paste("~/Downloads/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "AssignsByBarc.csv", sep=""))
+
+N_Timepoint = as.data.frame(table(MergedNodes$SampleBroad))
+CompilePercents = as.data.frame(matrix(ncol =6, nrow=0))
+colnames(CompilePercents) = c("Timepoint", "N_Node", "N_All", "Percent_Time", "Percent_TimeNode", "Node")
+
+for(y in unique(MergedNodes$Node)){
+Pull_Spec = subset(MergedNodes, MergedNodes$Node %in% y)  
+ReduceSpec = as.data.frame(table(Pull_Spec$SampleBroad))
+ReduceSpec_merge = merge(ReduceSpec, N_Timepoint, by = "Var1", all = T)
+ReduceSpec_merge[is.na(ReduceSpec_merge)] <- 0
+ReduceSpec_merge$Percent = ReduceSpec_merge$Freq.x / ReduceSpec_merge$Freq.y
+ReduceSpec_merge$Percent2 = ReduceSpec_merge$Percent/sum(ReduceSpec_merge$Percent)*100
+colnames(ReduceSpec_merge) = c("Timepoint", "N_Node", "N_All", "Percent_Time", "Percent_TimeNode")
+ReduceSpec_merge$Node = y
+CompilePercents = rbind(CompilePercents, ReduceSpec_merge)
+}
+
+CompilePercents$Trimester = ifelse(CompilePercents$Timepoint %in% c("GW10",  "GW12"), "Tri1", CompilePercents$Timepoint)
+CompilePercents$Trimester = ifelse(CompilePercents$Timepoint %in% c("GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25"), "Tri2", CompilePercents$Trimester)
+CompilePercents$Trimester = ifelse(CompilePercents$Timepoint %in% c("Adult_PO", "Adult_PO/SO", "Adult_SO", "Adult_SO/TUB",   "Adult_TUB",   "Adult_TUB/MN",   "Adult_MN"), "Adult", CompilePercents$Trimester)
+CompilePercents$Trimester = factor(CompilePercents$Trimester, levels = c("Tri1", "Tri2", "Adult"))
+
+## FIG 2G
+SP = ggplot(CompilePercents, aes(fill=Timepoint, y=Percent_TimeNode, x=Node))+ theme_classic() +
+      geom_bar(position="stack", stat="identity") + theme(legend.position = "right", axis.text = element_text(size = 4), axis.title = element_text(size = 4), axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5), legend.title = element_blank(), legend.text = element_text(size = 5)) + ylab("% cells") + xlab("")+ scale_y_continuous(expand= c(0,0)) + scale_fill_manual(values = TimepointColors_FetalAdultDissect)
+
+#pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_20_20_", x, "_NodesOrderPlot.pdf", sep=""), #width = 4.5, height = 1.5)
+#print(SP)
+#dev.off()
+
+SP = SP + NoLegend()
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "_NodesOrderPlotNoLegend.pdf", sep=""), width = 3, height = 1.25)
+print(SP)
+dev.off()
+
+## FIG 2H
+SP = ggplot(CompilePercents, aes(fill=Trimester, y=Percent_TimeNode, x=Node))+ theme_classic() +
+      geom_bar(position="stack", stat="identity") + theme(legend.position = "right", axis.text = element_text(size = 4), axis.title = element_text(size = 4), axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5), legend.title = element_blank(), legend.text = element_text(size = 5)) + ylab("% cells") + xlab("")+ scale_y_continuous(expand= c(0,0))+ scale_fill_manual(values = TrimesterColors)
+
+#pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "_NodesOrderTrimesterPlot.pdf", sep=""), width = 4.5, height = 1.5)
+#print(SP)
+#dev.off()
+
+
+SP = SP + NoLegend()
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "_NodesOrderPlotTrimesterNoLegend.pdf", sep=""), width = 3, height = 1.25)
+print(SP)
+dev.off()
+}
+
+
+############################# Matching trajectories/Alluvial/Piecharts ############################ 
+##################################### For Fig 2 supplementals #####################################
+#AlluvialPlot
+MainAssign = read.csv("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k100AssignsByBarc.csv", na.strings=c("","NA"))
+
+GetMismatches = c()
+
+for(LIN in c("3_k150", "6_k100", "3_k20")){ #, ))
+AltAssign = read.csv(paste("~/Downloads/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "AssignsByBarc.csv", sep=""), na.strings=c("","NA"))
+
+MergeAssigns = merge(MainAssign, AltAssign, by = "Barcs")
+PullAssigns = MergeAssigns %>% dplyr::select("Barcs", "Nuclei.x", "Nuclei.y")
+#PullAssigns$Match = PullAssigns$Nuclei.x == PullAssigns$Nuclei.y
+PullAssigns$x = 1
+FreqAssigns = PullAssigns %>% group_by(Nuclei.x, Nuclei.y) %>% dplyr::summarise(Freq = sum(x))
+#FreqAssigns = gsub("", "Unassigned", FreqAssigns)
+FreqAssigns[is.na(FreqAssigns)] = "Unassigned" 
+FreqAssigns$Nuclei.x = factor(FreqAssigns$Nuclei.x, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO", "AH", "ID", "SMN", "MN", "Unassigned"))
+
+Alluvial =ggplot(data = FreqAssigns,
+       aes(axis1 = Nuclei.x,   # First variable on the X-axis
+           axis2 = Nuclei.y, # Second variable on the X-axis
+           y = Freq)) +
+  geom_alluvium(aes(fill = Nuclei.x)) +
+  geom_stratum( color = "grey") +
+  geom_text(stat = "stratum", size = 1.5,
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Nuclei.x", "Nuclei.x"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+NoLegend()+ scale_fill_manual(values = NucleiColors)
+
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "_Alluvial.pdf", sep=""), width = 2.5, height = 2.5)
+print(Alluvial)
+dev.off()
+
+FreqAssigns$Match = FreqAssigns$Nuclei.x == FreqAssigns$Nuclei.y
+FreqAssigns2 = FreqAssigns %>% group_by(Match) %>% dplyr::summarise(Total = sum(Freq))
+FreqAssigns2$Percent = FreqAssigns2$Total/ sum(FreqAssigns2$Total)*100
+FreqAssigns2$Label = paste(FreqAssigns2$Match, " (", signif(FreqAssigns2$Percent, digits = 3), "%)", sep="")
+
+PIE = ggplot(FreqAssigns2, aes(x="", y=Total, fill=Label)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+FreqAssigns2 = subset(FreqAssigns2, FreqAssigns2$Match == F)
+GetMismatches = c(GetMismatches, FreqAssigns2$Percent)
+
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+}
+
+
+#####
+#Alt 1 to 2 and 3
+MainAssign = read.csv("~/Downloads/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k20AssignsByBarc.csv", na.strings=c("","NA"))
+
+for(LIN in c("3_k150", "6_k100")){ 
+AltAssign = read.csv(paste("~/Downloads/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "AssignsByBarc.csv", sep=""), na.strings=c("","NA"))
+
+MergeAssigns = merge(MainAssign, AltAssign, by = "Barcs")
+PullAssigns = MergeAssigns %>% dplyr::select("Barcs", "Nuclei.x", "Nuclei.y")
+#PullAssigns$Match = PullAssigns$Nuclei.x == PullAssigns$Nuclei.y
+PullAssigns$x = 1
+FreqAssigns = PullAssigns %>% group_by(Nuclei.x, Nuclei.y) %>% dplyr::summarise(Freq = sum(x))
+FreqAssigns[is.na(FreqAssigns)] = "Unassigned" 
+FreqAssigns$Nuclei.x = factor(FreqAssigns$Nuclei.x, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO","AH", "ID", "SMN", "MN", "Unassigned"))
+
+Alluvial =ggplot(data = FreqAssigns,
+       aes(axis1 = Nuclei.x,   # First variable on the X-axis
+           axis2 = Nuclei.y, # Second variable on the X-axis
+           y = Freq)) +
+  geom_alluvium(aes(fill = Nuclei.x)) +
+  geom_stratum( color = "grey") +
+  geom_text(stat = "stratum", size = 1.5,
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Nuclei.x", "Nuclei.x"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+NoLegend()+ scale_fill_manual(values = NucleiColors)
+
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_ALT1to20_20_", LIN, "_Alluvial.pdf", sep=""), width = 2.5, height = 2.5)
+print(Alluvial)
+dev.off()
+
+FreqAssigns$Match = FreqAssigns$Nuclei.x == FreqAssigns$Nuclei.y
+FreqAssigns2 = FreqAssigns %>% group_by(Match) %>% dplyr::summarise(Total = sum(Freq))
+FreqAssigns2$Percent = FreqAssigns2$Total/ sum(FreqAssigns2$Total)*100
+FreqAssigns2$Label = paste(FreqAssigns2$Match, " (", signif(FreqAssigns2$Percent, digits = 3), "%)", sep="")
+
+PIE = ggplot(FreqAssigns2, aes(x="", y=Total, fill=Label)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+FreqAssigns2 = subset(FreqAssigns2, FreqAssigns2$Match == F)
+GetMismatches = c(GetMismatches, FreqAssigns2$Percent)
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_ALT1to20_20_", LIN, "_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+}
+
+#Alt2 to 3
+MainAssign = read.csv("~/Downloads/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k150AssignsByBarc.csv", na.strings=c("","NA"))
+AltAssign = read.csv(paste("~/Downloads/Fig2_Trajectories_GLOTMP_17JAN_20_20_6_k100AssignsByBarc.csv", sep=""), na.strings=c("","NA"))
+
+MergeAssigns = merge(MainAssign, AltAssign, by = "Barcs")
+PullAssigns = MergeAssigns %>% dplyr::select("Barcs", "Nuclei.x", "Nuclei.y")
+#PullAssigns$Match = PullAssigns$Nuclei.x == PullAssigns$Nuclei.y
+PullAssigns$x = 1
+FreqAssigns = PullAssigns %>% group_by(Nuclei.x, Nuclei.y) %>% dplyr::summarise(Freq = sum(x))
+FreqAssigns[is.na(FreqAssigns)] = "Unassigned" 
+FreqAssigns$Nuclei.x = factor(FreqAssigns$Nuclei.x, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO","AH","ID", "SMN", "MN", "Unassigned"))
+
+Alluvial =ggplot(data = FreqAssigns,
+       aes(axis1 = Nuclei.x,   # First variable on the X-axis
+           axis2 = Nuclei.y, # Second variable on the X-axis
+           y = Freq)) +
+  geom_alluvium(aes(fill = Nuclei.x)) +
+  geom_stratum( color = "grey") +
+  geom_text(stat = "stratum", size = 1.5,
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Nuclei.x", "Nuclei.x"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+NoLegend()+ scale_fill_manual(values = NucleiColors)
+
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_ALT2to20_20_6_k100_Alluvial.pdf", sep=""), width = 2.5, height = 2.5)
+print(Alluvial)
+dev.off()
+
+FreqAssigns$Match = FreqAssigns$Nuclei.x == FreqAssigns$Nuclei.y
+FreqAssigns2 = FreqAssigns %>% group_by(Match) %>% dplyr::summarise(Total = sum(Freq))
+FreqAssigns2$Percent = FreqAssigns2$Total/ sum(FreqAssigns2$Total)*100
+FreqAssigns2$Label = paste(FreqAssigns2$Match, " (", signif(FreqAssigns2$Percent, digits = 3), "%)", sep="")
+
+PIE = ggplot(FreqAssigns2, aes(x="", y=Total, fill=Label)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+FreqAssigns2 = subset(FreqAssigns2, FreqAssigns2$Match == F)
+GetMismatches = c(GetMismatches, FreqAssigns2$Percent)
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_ALT2to20_20_", LIN, "_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+
+AvgPie = as.data.frame(matrix(ncol=2, nrow=1))
+
+Mismatch = as.data.frame(c("FALSE", mean(GetMismatches)))
+Mismatch$Match = c("TRUE", mean((100-(GetMismatches))))
+Mismatch = as.data.frame(t(Mismatch))
+colnames(Mismatch)= c("Label", "Value")
+Mismatch$Value = as.numeric(Mismatch$Value)
+PIE = ggplot(data =Mismatch,aes(x="", y=Value, fill=Label))+
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+
+pdf(paste("Fig2_Trajectories_GLOTMP_17JAN_Averaged_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+
+
+
+MainAssign = read.csv("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k100AssignsByBarc.csv", na.strings=c("","NA"))
+MainAssign2 = MainAssign %>% dplyr::select(Node, Nuclei)
+row.names(MainAssign2) = MainAssign$Barcs
+
+for(LIN in c("3_k20", "3_k150", "6_k100")){ #, ))
+AltAssign = read.csv(paste("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "AssignsByBarc.csv", sep=""), na.strings=c("","NA"))
+AltAssign2 = AltAssign %>% dplyr::select(Node, Nuclei)
+row.names(AltAssign2) = AltAssign$Barcs
+AltName = ifelse(LIN == "3_k20", "Alt1", "")
+AltName = ifelse(LIN == "3_k150", "Alt2", AltName)
+AltName = ifelse(LIN == "6_k100", "Alt3", AltName)
+colnames(AltAssign2) = paste(colnames(AltAssign2), AltName, sep="_")
+MainAssign2 = merge(MainAssign2, AltAssign2, by = 0, all = T)
+row.names(MainAssign2) = MainAssign2$Row.names
+MainAssign2$Row.names = NULL
+}
+
+write.csv(MainAssign2, "Trajectory_Barcodes.csv")
+MainAssign2 = na.omit(MainAssign2)
+
+
+###
+MainAssign = read.csv("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k100AssignsByBarc.csv", na.strings=c("","NA"))
+
+MainAssign$Trimester = ifelse(MainAssign$SampleAdult %in% c("GW10",  "GW12"), "Tri 1", MainAssign$SampleAdult)
+MainAssign$Trimester = ifelse(MainAssign$SampleAdult %in% c("GW15",  "GW16", "GW18", "GW19", "GW20", "GW22", "GW25" ), "Tri 2", MainAssign$Trimester)
+MainAssign$Nuclei[is.na(MainAssign$Nuclei)] = "Unassigned"
+MainAssign$Nuc_Tri = paste(MainAssign$Nuclei, MainAssign$Trimester, sep=" - ")
+MainAssign2 = MainAssign %>% dplyr::select(Nuc_Tri)
+row.names(MainAssign2) = MainAssign$Barcs
+MainAssign2$Nuc_Tri = factor(MainAssign2$Nuc_Tri, levels = rev(c("TM - Tri 1", "TM - Tri 2", "TM - Adult", "ARC - Tri 1", "ARC - Tri 2", "ARC - Adult", "PVH - Tri 1","PVH - Tri 2", "PVH - Adult",  "VMH - Tri 1", "VMH - Tri 2", "VMH - Adult","DMH - Tri 1",  "DMH - Tri 2", "DMH - Adult", "LH - Tri 1", "LH - Tri 2", "LH - Adult", "SCN - Tri 1", "SCN - Tri 2", "SCN - Adult", "PO - Tri 1", "PO - Tri 2", "PO - Adult",  "AH - Tri 1","AH - Tri 2",  "AH - Adult","SMN - Tri 1","SMN - Tri 2", "SMN - Adult",  "MN - Tri 1", "MN - Tri 2", "MN - Adult", "Unassigned - Tri 1", "Unassigned - Tri 2", "Unassigned - Adult")))
+EdKaZhouHypoNeurons_V2 = subset(EdKaZhouHypoNeurons, cells = row.names(MainAssign2))
+EdKaZhouHypoNeurons_V2 = AddMetaData(EdKaZhouHypoNeurons_V2, MainAssign2, "MainAssign_Nuclei")
+
+Idents(EdKaZhouHypoNeurons_V2) = "MainAssign_Nuclei"
+EdKaZhouHypoNeurons_V3 = subset(EdKaZhouHypoNeurons_V2, idents = c("Unassigned - Tri 1", "Unassigned - Tri 2", "Unassigned - Adult"), invert=T)
+
+DefaultAssay(EdKaZhouHypoNeurons_V3) = "RNA"
+
+DotP= DotPlot(EdKaZhouHypoNeurons_V3, assay = "SCT", features = c("POMC","GHRH","KISS1", "AGRP", "NPY", "GAL", "TRH","OXT", "AVP", "CRH","TH", "MC4R", "CCK", "CARTPT", "HCRT","PDYN", "SST", "LEPR", "GLP1R", "GHSR"),  cols = c("#FFFFFF", HeatmapBlue), dot.min = 0.0, col.min=0, dot.scale	=3) + theme(axis.text.x = element_text(face="italic", angle = 90, vjust = 0.5, hjust=1))  + ylab("")+xlab("")
+
+pdf(paste("Fig2_NP_byNuc_DotPlot.pdf", sep=""), width = 7, height = 5.5)
+print(DotP)
+dev.off()
+
+
+#### ALL TIMEPOINTS FOR SUPP ###
+MainAssign = read.csv("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k100AssignsByBarc.csv", na.strings=c("","NA"))
+
+MainAssign$Nuclei[is.na(MainAssign$Nuclei)] = "Unassigned"
+MainAssign = subset(MainAssign, ! MainAssign$Nuclei== "Unassigned")
+MainAssign$Nuc_Samp = paste(MainAssign$Nuclei, MainAssign$SampleAdult, sep=" - ")
+MainAssign2 = MainAssign %>% dplyr::select(Nuc_Samp)
+row.names(MainAssign2) = MainAssign$Barcs
+Nuc_Samp_Order = c("TM - GW10", "TM - GW12", "TM - GW15", "TM - GW16", "TM - GW18", "TM - GW19", "TM - GW20", "TM - GW22", "TM - GW25","TM - Adult",  "ARC - GW10", "ARC - GW12", "ARC - GW15", "ARC - GW16", "ARC - GW18", "ARC - GW19", "ARC - GW20", "ARC - GW22", "ARC - GW25","ARC - Adult", "PVH - GW10", "PVH - GW12", "PVH - GW15", "PVH - GW16", "PVH - GW18", "PVH - GW19", "PVH - GW20", "PVH - GW22", "PVH - GW25","PVH - Adult","VMH - GW10", "VMH - GW12", "VMH - GW15", "VMH - GW16", "VMH - GW18", "VMH - GW19", "VMH - GW20", "VMH - GW22", "VMH - GW25", "VMH - Adult",  "DMH - GW10", "DMH - GW12", "DMH - GW15", "DMH - GW16", "DMH - GW18", "DMH - GW19", "DMH - GW20", "DMH - GW22", "DMH - GW25","DMH - Adult", "LH - GW10", "LH - GW12", "LH - GW15", "LH - GW16",  "LH - GW18", "LH - GW19", "LH - GW20", "LH - GW22", "LH - Adult",   "SCN - GW10", "SCN - GW12", "SCN - GW15", "SCN - GW16", "SCN - GW18", "SCN - GW19", "SCN - GW20", "SCN - GW22", "SCN - GW25", "SCN - Adult","PO - GW10", "PO - GW12", "PO - GW15", "PO - GW16", "PO - GW18", "PO - GW19", "PO - GW20", "PO - GW22", "PO - GW25","PO - Adult", "AH - GW10", "AH - GW12", "AH - GW15", "AH - GW16", "AH - GW18", "AH - GW19",  "AH - GW20", "AH - GW22", "AH - GW25",  "AH - Adult",  "SMN - GW10", "SMN - GW12", "SMN - GW15", "SMN - GW16", "SMN - GW18", "SMN - GW19", "SMN - GW20", "SMN - GW22", "SMN - GW25","SMN - Adult",  "MN - GW10", "MN - GW12", "MN - GW15", "MN - GW16", "MN - GW18", "MN - GW19", "MN - GW20", "MN - GW22", "MN - GW25",  "MN - Adult")
+
+MainAssign2$Nuc_Samp = factor(MainAssign2$Nuc_Samp, levels = rev(Nuc_Samp_Order))
+EdKaZhouHypoNeurons_V2 = subset(EdKaZhouHypoNeurons, cells = row.names(MainAssign2))
+EdKaZhouHypoNeurons_V2 = AddMetaData(EdKaZhouHypoNeurons_V2, MainAssign2, "MainAssign_Nuclei")
+
+Idents(EdKaZhouHypoNeurons_V2) = "MainAssign_Nuclei"
+
+DefaultAssay(EdKaZhouHypoNeurons_V2) = "RNA"
+
+DotP= DotPlot(EdKaZhouHypoNeurons_V2, assay = "SCT", features = c("POMC","GHRH","KISS1", "AGRP", "NPY", "GAL", "TRH","OXT", "AVP", "CRH","TH", "MC4R", "CCK", "CARTPT", "HCRT","PDYN", "SST", "LEPR", "GLP1R", "GHSR"),  cols = c("#FFFFFF", HeatmapBlue), dot.min = 0.0, col.min=0, dot.scale	=3) + theme(axis.text.x = element_text(face="italic", angle = 90, vjust = 0.5, hjust=1))  + ylab("")+xlab("")
+
+pdf(paste("Fig2_NP_byNuc_DotPlot_V3.pdf", sep=""), width = 7, height = 20)
+print(DotP)
+dev.off()
+
+
+########
+
+
+NPGenes = c("POMC","GHRH","KISS1", "AGRP", "NPY", "GAL", "TRH","OXT", "AVP", "CRH","TH", "MC4R", "CCK", "CARTPT", "HCRT","PDYN", "SST", "LEPR", "GLP1R", "GHSR")
+
+NucleiData = EdKaZhouHypoNeurons_V3@assays$RNA@data[NPGenes, colnames(EdKaZhouHypoNeurons_V3)]
+NucleiData = as.data.frame(t(as.data.frame(NucleiData)))
+NucleiData2 = as.data.frame(apply(NucleiData, 2, normalized))
+row.names(NucleiData2) = row.names(NucleiData)
+NucleiData3 = merge(NucleiData2, MainAssign2, by = 0)
+NucleiData3$Row.names = NULL
+NucleiData4 = NucleiData3 %>% group_by(Nuc_Tri) %>% dplyr::summarise(across(everything(), mean))
+NucleiData4 = as.data.frame(NucleiData4)
+row.names(NucleiData4) = NucleiData4$Nuc_Tri
+NucleiData4$Nuc_Tri = NULL
+NucleiData4 = sweep(NucleiData4,2,colSums(NucleiData4),`/`)
+NucleiData5 = gather(NucleiData4, Gene, Expression)
+NucleiData5$Nuc_Tri = row.names(NucleiData4)
+NucleiData5$Expression = NucleiData5$Expression*100
+
+Seu_NormalizedPercent = ggplot(NucleiData5, aes(fill=Nuc_Tri, y=Expression, x=Gene)) + geom_bar(position="stack", stat="identity") + ylab("% normalized expression") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "right", legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5)) #+ scale_fill_manual(values = Fig3_Colors_Study)
+pdf("Fig2-PercentNormExpression.pdf", width = 10, height =5)
+print(Seu_NormalizedPercent)
+dev.off()
+
+#### AGRP/NPY/POMC COEXPRESSION FOR SUPPLEMENTALS
+NucleiData = EdKaZhouHypoNeurons@assays$SCT@data[c("AGRP", "NPY", "POMC", "CARTPT", "KISS1"), colnames(EdKaZhouHypoNeurons)]
+
+
+MainAssign = read.csv("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k100AssignsByBarc.csv", na.strings=c("","NA"))
+ARC_Cells = subset(MainAssign, MainAssign$Nuclei == "ARC")
+
+
+NucleiData = as.data.frame(t(as.data.frame(NucleiData)))
+NucleiData = subset(NucleiData, row.names(NucleiData) %in% ARC_Cells$Barcs)
+
+ARC_Cells_Samp = ARC_Cells %>% dplyr::select(SampleAdult)
+row.names(ARC_Cells_Samp) = ARC_Cells$Barcs
+
+SampleAdult_Table = as.data.frame(table(ARC_Cells_Samp$SampleAdult))
+NucleiData2 = merge(NucleiData, ARC_Cells_Samp, by =0)
+
+
+
+#EARLY = subset(NucleiData2, NucleiData2$SampleAdult %in% c("GW10", "GW12", "GW15"))
+NucleiData2$`AGRP/NPY` = ifelse(NucleiData2$AGRP > 1.5  & NucleiData2$NPY > 2, 1, 0)
+NucleiData2$`POMC/CARTPT` = ifelse(NucleiData2$POMC > 0  & NucleiData2$CARTPT > 3 , 1, 0)
+NucleiData2$`POMC/NPY` = ifelse(NucleiData2$POMC > 0  & NucleiData2$NPY > 2, 1, 0)
+
+NucleiData2$NPY = ifelse(NucleiData$NPY > 2  & NucleiData2$`AGRP/NPY` <= 0 & NucleiData2$`POMC/CARTPT` <= 0 & NucleiData2$`POMC/NPY` <= 0, 1, 0)
+NucleiData2$POMC = ifelse(NucleiData$POMC > 0  & NucleiData2$`AGRP/NPY` <= 0 & NucleiData2$`POMC/CARTPT` <= 0 & NucleiData2$`POMC/NPY` <= 0, 1, 0)
+NucleiData2$AGRP = ifelse(NucleiData$AGRP > 1.5  & NucleiData2$`AGRP/NPY` <= 0 & NucleiData2$`POMC/CARTPT` <= 0 & NucleiData2$`POMC/NPY` <= 0, 1, 0)
+NucleiData2$CARTPT = ifelse(NucleiData$CARTPT > 3  & NucleiData2$`AGRP/NPY` <= 0 & NucleiData2$`POMC/CARTPT` <= 0 & NucleiData2$`POMC/NPY` <= 0, 1, 0)
+NucleiData2$KISS1 = ifelse(NucleiData$KISS1 > 1  & NucleiData2$`AGRP/NPY` <= 0 & NucleiData2$`POMC/CARTPT` <= 0 & NucleiData2$`POMC/NPY` <= 0, 1, 0)
+
+
+NucleiData3 = as.data.frame(NucleiData2 %>% group_by(SampleAdult) %>% dplyr::summarise("AGRP/NPY" = sum(`AGRP/NPY`), "POMC/CARTPT" = sum(`POMC/CARTPT`),"POMC/NPY" = sum(`POMC/NPY`),"NPY" = sum(NPY),"POMC" = sum(POMC),"AGRP" = sum(AGRP),"CARTPT" = sum(CARTPT),"KISS1" = sum(KISS1)))
+row.names(NucleiData3) = NucleiData3$SampleAdult
+NucleiData3$SampleAdult = NULL
+NucleiData4 = gather(NucleiData3, Sample, Count)
+NucleiData4$Time = row.names(NucleiData3)
+
+NucleiData5 = merge(NucleiData4, SampleAdult_Table, by.x = "Time", by.y ="Var1")
+NucleiData5$Percent = NucleiData5$Count/NucleiData5$Freq*100
+
+NucleiData5$Sample  = factor(NucleiData5$Sample, levels = c("POMC", "KISS1", "AGRP", "NPY", "CARTPT", "AGRP/NPY", "POMC/NPY", "POMC/CARTPT"))
+NucleiData5$Time  = factor(NucleiData5$Time, levels = c("GW10",  "GW12",  "GW15",  "GW16",  "GW18",  "GW19",  "GW20",  "GW22",  "GW25", "Adult"))
+
+CoexpPlot = ggplot(NucleiData5, aes(x= Sample, y = Count, fill = Time)) +geom_col() + theme_classic() +xlab("") + ylab("n positive cells") + theme(axis.text.x = element_text(angle = 90, hjust =1, vjust = 0.5)) +scale_y_continuous(expand = c(0,0))+ scale_fill_manual(values = TimepointColors_FetalAdult)
+
+
+pdf("AGRP_POMC_NPY_Coexpression.pdf", width = 5, height = 5)
+print(CoexpPlot)
+dev.off()
+
+
+##NEUROPEPTIDE TIME COURSE FEATURE PLOTS FOR SUPPLEMENTAL
+
+Idents(EdKaZhouHypoNeurons) = "SampleAdult"
+DefaultAssay(EdKaZhouHypoNeurons) = "RNA"
+EdKaZhouHypoNeurons@meta.data$SampleAdult = factor(EdKaZhouHypoNeurons@meta.data$SampleAdult, levels = c("GW10",  "GW12",  "GW15",  "GW16",  "GW18",  "GW19",  "GW20",  "GW22",  "GW25", "Adult"))
+
+for(y in c("POMC", "NPY", "AGRP", "KISS1", "OXT", "AVP", "CRH", "TRH")){
+if(y %in% c("TRH", "CRH")){lim = 5.5}else if(y %in% c("POMC", "KISS1", "AGRP")){lim = 6.3}else if(y %in% c("NPY", "AVP")){lim = 7}else if(y %in% c("OXT")){lim = 9}
+  
+NewFP = list()
+for(x in c("GW10",  "GW12",  "GW15",  "GW16",  "GW18",  "GW19",  "GW20",  "GW22",  "GW25", "Adult")){
+Idents(EdKaZhouHypoNeurons) = "SampleAdult"
+
+Sub = subset(EdKaZhouHypoNeurons, idents = x)
+NewFP[[x]] = FeaturePlot(Sub, y) +theme(axis.line = element_blank(),  axis.ticks = element_blank(), axis.text = element_blank(), axis.title.y.right = element_blank(),  axis.title = element_blank(), plot.title = element_text(size = 14, face = "italic", hjust=0))+ NoLegend()+scale_color_gradientn(colours = c("lightgrey", GreenDark), limits = c(0, lim)) +ggtitle(x) 
+}
+
+Legend = FeaturePlot(EdKaZhouHypoNeurons, y)+ scale_color_gradientn(colours = c("lightgrey", GreenDark), limits = c(0, lim)) 
+LegendOnly = ggpubr::get_legend(Legend)
+
+
+NewFP[["Legend"]]= ggpubr::get_legend(Legend)
+pdf(paste("TimecourseFPs_", y, ".pdf", sep=""), width = 10, height = 8)
+print(plot_grid(plotlist = NewFP, ncol=4))
+dev.off()
+}
+
+```
+
+
+
+
+
+
+#FIG2-MRTREE
+```{r}
+MRTreeRes = readRDS("~/Downloads/tree80_L15_treeTrim.rds")
+Resolutions = as.data.frame(MRTreeRes)
+Resolutions$K560 = gsub(558, 11, gsub(554, 544, gsub(551, 348,  Resolutions$K560)))
+Resolutions$K494 = gsub(508, 29,  Resolutions$K494)
+
+
+Resolutions$Compile = paste(Resolutions[[1]], Resolutions[[2]], Resolutions[[3]], Resolutions[[4]], Resolutions[[5]], Resolutions[[6]], Resolutions[[7]], Resolutions[[8]],  Resolutions[[9]], Resolutions[[10]], Resolutions[[11]],  Resolutions[[12]],  Resolutions[[13]], Resolutions[[14]], Resolutions[[15]])
+Resolutions$CompileDups = duplicated(Resolutions$Compile)
+Resolutions2 = subset(Resolutions, Resolutions$CompileDups == F)
+Resolutions2 = Resolutions2[order(Resolutions2$Compile), ]
+
+write.csv(Resolutions2, "Resolutions.csv")
+
+AdultHypo = subset(EdKaZhouHypoNeurons, cells = row.names(Resolutions))
+
+#Gene Lists
+NucleiMarkers = read.csv("~/Dropbox/LabMac/NucleiMarkers.csv")
+NucleiMarkers = subset(NucleiMarkers, ! NucleiMarkers$Gene == "TRPM3")
+NeuronClassGenes = as.data.frame(c("SLC17A6","SLC17A7","SLC17A8", "SLC32A1", "GAD2", "HDC"))
+NeuronClassGenes$Class = c("Glutaminergic", "Glutaminergic", "Glutaminergic", "GABAergic", "GABAergic", "Histaminergic")  
+colnames(NeuronClassGenes) = c("Gene", "Class")
+
+
+
+### Coverage Table for supplementals
+SupTableFig2Hicat_Recompile_Reduced = as.data.frame(matrix(ncol = 8, nrow=0))
+colnames(SupTableFig2Hicat_Recompile_Reduced) = c("Level","Cluster","29YO_NCells",  "29YO_Percent", "42YO_NCells", "42YO_Percent", "50YO_NCells",  "50YO_Percent")
+for(y in c("K6", "K16", "K28", "K40", "K55", "K116", "K169", "K199", "K229", "K285", "K341", "K391", "K444", "K494", "K560")){
+PullMeta = Resolutions %>% dplyr::select(y)
+AdultHypo = AddMetaData(AdultHypo, PullMeta, "NeuronClusters")  
+PullMeta2 = AdultHypo@meta.data %>% dplyr::select(NeuronClusters, Age, count)
+
+PullMeta2 = AdultHypo@meta.data %>% group_by(NeuronClusters, Age) %>% dplyr::summarise("NCells" = sum(count))
+PullMeta3 = merge(PullMeta2, AgeTable, by.x = "Age", by.y = "Var1")
+PullMeta3$Percent = PullMeta3$NCells/PullMeta3$Freq *100
+PullMeta3$Freq = NULL
+
+GetPercents = PullMeta3 %>% group_by(NeuronClusters) %>% dplyr::summarise("CumulPercent" = sum(Percent))
+PullMeta3 = merge(PullMeta3, GetPercents, by= "NeuronClusters")
+PullMeta3$AdjPercent = PullMeta3$Percent/PullMeta3$CumulPercent *100
+PullMeta3$Percent = NULL
+PullMeta3$CumulPercent = NULL
+PullMeta3 = PullMeta3[order(PullMeta3$Age, PullMeta3$NeuronClusters), ]
+TempTable = as.data.frame(matrix(ncol=1, nrow=length(unique(PullMeta3$NeuronClusters))))
+TempTable$Level = y
+TempTable$Cluster = unique(PullMeta3$NeuronClusters)
+TempTable$V1 = NULL
+for(x in unique(PullMeta3$Age)){
+Subs = subset(PullMeta3, PullMeta3$Age == x)
+Subs$Age = NULL
+colnames(Subs) = c("Cluster", paste(x, "YO_NCells", sep=""), paste(x, "YO_Percent", sep=""))
+TempTable = merge(TempTable, Subs, by = "Cluster", all=T)
+}
+SupTableFig2Hicat_Recompile_Reduced = rbind(SupTableFig2Hicat_Recompile_Reduced, TempTable)
+
+}
+
+
+PercentCutoff = 5
+SupTableFig2Hicat_Recompile_Reduced[is.na(SupTableFig2Hicat_Recompile_Reduced)] = 0
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] > PercentCutoff, "3 donors", "")
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] <= PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] > PercentCutoff, "2 donors", SupTableFig2Hicat_Recompile_Reduced$Donor)
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] <= PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] > PercentCutoff, "2 donors", SupTableFig2Hicat_Recompile_Reduced$Donor)
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] <= PercentCutoff, "2 donors", SupTableFig2Hicat_Recompile_Reduced$Donor)
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] <= PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] <= PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] > PercentCutoff, "1 donor", SupTableFig2Hicat_Recompile_Reduced$Donor)
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] <= PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] <= PercentCutoff, "1 donor", SupTableFig2Hicat_Recompile_Reduced$Donor)
+SupTableFig2Hicat_Recompile_Reduced$Donor = ifelse(SupTableFig2Hicat_Recompile_Reduced[["29YO_Percent"]] <= PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["42YO_Percent"]] > PercentCutoff & SupTableFig2Hicat_Recompile_Reduced[["50YO_Percent"]] <= PercentCutoff, "1 donor", SupTableFig2Hicat_Recompile_Reduced$Donor)
+
+write.csv(SupTableFig2Hicat_Recompile_Reduced, "Fig2_AdultSampleCoverage.csv", row.names=F)
+
+
+
+
+#CODE USED FOR DETERMINING CLASSES
+DefaultAssay(AdultHypo) = "RNA"
+CompileClasses = list()
+for(y in c("K6", "K16", "K28", "K40", "K55", "K116", "K169", "K199", "K229", "K285", "K341", "K391", "K444", "K494", "K560" )){
+PullMeta = Resolutions %>% dplyr::select(y)
+PullMeta[[y]] = factor(PullMeta[[y]], levels = rev(unique(Resolutions2[[y]])))
+AdultHypo = AddMetaData(AdultHypo, PullMeta, y)  
+Idents(AdultHypo) = y
+  data.features <- FetchData(object = AdultHypo, vars = c("SLC32A1", "GAD2", "HDC", "SLC17A6","SLC17A7","SLC17A8"))
+  cells = colnames(AdultHypo)
+ data.features$id <- if (is.null(x = NULL)) {
+    Idents(object = AdultHypo)[cells, drop = TRUE]
+  } else {
+    AdultHypo[[group.by, drop = TRUE]][cells, drop = TRUE]
+  }
+  data.plot <- lapply(X = unique(x = data.features$id), FUN = function(ident) {
+    data.use <- data.features[data.features$id == ident, 
+      1:(ncol(x = data.features) - 1), drop = FALSE]
+    avg.exp <- apply(X = data.use, MARGIN = 2, FUN = function(x) {
+      return(mean(x = expm1(x = x)))
+    })
+    pct.exp <- apply(X = data.use, MARGIN = 2, FUN = PercentAbove, threshold = 0)
+    return(list(avg.exp = avg.exp, pct.exp = pct.exp))
+  })
+  
+names(data.plot) = unique(data.features$id)
+  
+  
+  Assigns = as.data.frame(matrix(ncol = 3, nrow=0))
+  colnames(Assigns) = c("Cluster", "Class", "Genes")
+  for(x in  names(data.plot)){
+  DATA = as.data.frame(data.plot[[x]][[1]])
+  DATA$percent = data.plot[[x]][[2]]
+  colnames(DATA) = c("ExpLevel", "Percent")
+  DATA$Combo = DATA$ExpLevel * DATA$Percent
+  DATA2 = merge(DATA, NeuronClassGenes, by.x = 0, by.y = "Gene")
+  DATA3 = DATA2 %>% group_by(Class) %>% dplyr::summarise("MeanCombo" = mean(Combo))
+  DATA3 = DATA3[order(-DATA3$MeanCombo), ]
+  DATA3$Delta = DATA3$MeanCombo/max(DATA3$MeanCombo)
+  DATA4 = subset(DATA3, DATA3$Delta > 0.5)
+  if(dim(DATA4)[1] == 1){
+  DATA4$Delta = NULL  
+  DATA4$MeanCombo = NULL  
+  DATA4$Cluster = x
+  GetGenes = subset(DATA2, DATA2$Class == DATA4$Class)
+  GetGenes$Delta = GetGenes$Combo/max(GetGenes$Combo)
+  GetGenes = subset(GetGenes, GetGenes$Delta > 0.5)
+  DATA4$Genes = paste(GetGenes$Row.names, collapse="/")
+  
+  }else{
+  DATA4 = as.data.frame(t(c("Ambiguous", x, "")))
+  colnames(DATA4) = c("Class", "Cluster", "Genes")
+  }
+  
+  Assigns = rbind(Assigns, DATA4)
+}
+
+colnames(Assigns) = paste(colnames(Assigns), y, sep="_")
+PullMeta = Resolutions2 %>% dplyr::select(y, Compile)
+PullMeta2 = merge(PullMeta, Assigns, by.x = y, by.y =  paste("Cluster", y, sep="_"))
+CompileClasses[[y]] = PullMeta2
+write.csv(PullMeta2, paste("NeuronalClasses_ForCompile_", y, ".csv", sep=""), row.names = F)
+  
+
+Idents(AdultHypo) = y
+DP = DotPlot(AdultHypo, assay = "RNA", features = c("SLC32A1", "GAD2", "HDC", "SLC17A6","SLC17A7","SLC17A8"), cluster.idents = F)+theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust =1), axis.text.y =element_text(size = 8))
+DP_Order = as.data.frame(DP$data$id)
+DP_Order[[1]] = DP_Order[order(DP_Order[[1]]), ]
+DP_Order[[1]] = rev(unique(DP_Order[[1]]))
+
+write.csv(DP_Order, paste("DotPlotOrder_", y, ".csv", sep=""), row.names = F)
+pdf(paste("AdultHypo_NeuronClasses_", y, ".pdf", sep=""), height = length(unique(Resolutions[[y]]))/4+4, width =6)
+print(DP)
+dev.off()
+}
+
+CompileClasses2 = as.data.frame(CompileClasses[[1]])
+for(y in seq(2,length(CompileClasses), 1)){
+CompileClasses2 = merge(CompileClasses2, CompileClasses[[y]], by= "Compile")  
+}
+CompileClasses2$CompileClasses = paste(CompileClasses2$Class_K6, CompileClasses2$Class_K16, CompileClasses2$Class_K28, CompileClasses2$Class_K40, CompileClasses2$Class_K55, CompileClasses2$Class_K116, CompileClasses2$Class_K169, CompileClasses2$Class_K199, CompileClasses2$Class_K229, CompileClasses2$Class_K285, CompileClasses2$Class_K341, CompileClasses2$Class_K444, CompileClasses2$Class_K494, CompileClasses2$Class_K560, sep="/")
+
+write.csv(CompileClasses2, "CompileClasses2.csv")
+
+#CODE USED FOR DETERMINING NUCLEI
+DefaultAssay(AdultHypo) = "RNA"
+CompileNuclei = list()
+for(y in c("K6", "K16", "K28", "K40", "K55", "K116", "K169", "K199", "K229", "K285", "K341", "K391", "K444", "K494", "K560" )){
+PullMeta = Resolutions %>% dplyr::select(y)
+PullMeta[[y]] = factor(PullMeta[[y]], levels = rev(unique(Resolutions2[[y]])))
+AdultHypo = AddMetaData(AdultHypo, PullMeta, y)  
+Idents(AdultHypo) = y
+  data.features <- FetchData(object = AdultHypo, vars =unique(NucleiMarkers$Gene))
+  cells = colnames(AdultHypo)
+ data.features$id <- if (is.null(x = NULL)) {
+    Idents(object = AdultHypo)[cells, drop = TRUE]
+  } else {
+    AdultHypo[[group.by, drop = TRUE]][cells, drop = TRUE]
+  }
+  data.plot <- lapply(X = unique(x = data.features$id), FUN = function(ident) {
+    data.use <- data.features[data.features$id == ident, 
+      1:(ncol(x = data.features) - 1), drop = FALSE]
+    avg.exp <- apply(X = data.use, MARGIN = 2, FUN = function(x) {
+      return(mean(x = expm1(x = x)))
+    })
+    pct.exp <- apply(X = data.use, MARGIN = 2, FUN = PercentAbove, threshold = 0)
+    return(list(avg.exp = avg.exp, pct.exp = pct.exp))
+  })
+  
+names(data.plot) = unique(data.features$id)
+  
+  
+  Assigns = as.data.frame(matrix(ncol = 3, nrow=0))
+  colnames(Assigns) = c("Cluster", "Nuclei", "Genes")
+  for(x in  names(data.plot)){
+  DATA = as.data.frame(data.plot[[x]][[1]])
+  DATA$percent = data.plot[[x]][[2]]
+  colnames(DATA) = c("ExpLevel", "Percent")
+  DATA$Combo = DATA$ExpLevel * DATA$Percent
+  DATA2 = merge(DATA, NucleiMarkers, by.x = 0, by.y = "Gene")
+  DATA3 = DATA2 %>% group_by(Nuclei) %>% dplyr::summarise("MeanCombo" = mean(Combo))
+  DATA3 = DATA3[order(-DATA3$MeanCombo), ]
+  DATA3$Delta = DATA3$MeanCombo/max(DATA3$MeanCombo)
+  DATA4 = subset(DATA3, DATA3$Delta > 0.7)
+  if(dim(DATA4)[1] == 1){
+  DATA4$Delta = NULL  
+  DATA4$MeanCombo = NULL  
+  DATA4$Cluster = x
+  GetGenes = subset(DATA2, DATA2$Nuclei == DATA4$Nuclei)
+  GetGenes$Delta = GetGenes$Combo/max(GetGenes$Combo)
+  GetGenes = subset(GetGenes, GetGenes$Delta > 0.5)
+  DATA4$Genes = paste(GetGenes$Row.names, collapse="/")
+  
+  }else{
+  DATA4 = as.data.frame(t(c("Ambiguous", x, "")))
+  colnames(DATA4) = c("Nuclei", "Cluster", "Genes")
+  }
+  
+  Assigns = rbind(Assigns, DATA4)
+}
+
+colnames(Assigns) = paste(colnames(Assigns), y, sep="_")
+PullMeta = Resolutions2 %>% dplyr::select(y, Compile)
+PullMeta2 = merge(PullMeta, Assigns, by.x = y, by.y =  paste("Cluster", y, sep="_"))
+CompileNuclei[[y]] = PullMeta2
+write.csv(PullMeta2, paste("Nuclei_ForCompile_", y, ".csv", sep=""), row.names = F)
+  
+
+Idents(AdultHypo) = y
+DP = DotPlot(AdultHypo, assay = "RNA", features = unique(NucleiMarkers$Gene), cluster.idents = F)+theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust =1), axis.text.y =element_text(size = 8))
+DP_Order = as.data.frame(DP$data$id)
+DP_Order[[1]] = DP_Order[order(DP_Order[[1]]), ]
+DP_Order[[1]] = rev(unique(DP_Order[[1]]))
+
+write.csv(DP_Order, paste("DotPlotOrder_Nuclei_", y, ".csv", sep=""), row.names = F)
+pdf(paste("AdultHypo_Nuclei_", y, ".pdf", sep=""), height = length(unique(Resolutions[[y]]))/4+4, width =30)
+print(DP)
+dev.off()
+}
+
+CompileNuclei2 = as.data.frame(CompileNuclei[[1]])
+for(y in seq(2,length(CompileNuclei), 1)){
+CompileNuclei2 = merge(CompileNuclei2, CompileNuclei[[y]], by= "Compile")  
+}
+CompileNuclei2$CompileNuclei = paste(CompileNuclei2$Nuclei_K6, CompileNuclei2$Nuclei_K16, CompileNuclei2$Nuclei_K28, CompileNuclei2$Nuclei_K40, CompileNuclei2$Nuclei_K55, CompileNuclei2$Nuclei_K116, CompileNuclei2$Nuclei_K169, CompileNuclei2$Nuclei_K199, CompileNuclei2$Nuclei_K229, CompileNuclei2$Nuclei_K285, CompileNuclei2$Nuclei_K341, CompileNuclei2$Nuclei_K444, CompileNuclei2$Nuclei_K494, CompileNuclei2$Nuclei_K560, sep="/")
+
+write.csv(CompileNuclei2, "CompileNuclei2.csv")
+
+
+
+## COMPARE W TRAJECTORIES
+MainAssign_Nuclei = MainAssign %>% dplyr::select(Nuclei)
+MainAssign_Nuclei[is.na(MainAssign_Nuclei)] = "Unassigned"
+row.names(MainAssign_Nuclei) = MainAssign$Barcs
+AdultHypo = AddMetaData(AdultHypo, MainAssign_Nuclei, "MainAssign_Nuclei")
+
+for(y in rev(c("K6", "K16", "K28", "K40", "K55", "K116", "K169", "K199", "K229", "K285", "K341", "K391", "K444", "K494", "K560" ))){
+PullMeta = Resolutions %>% dplyr::select(y)
+PullMeta[[y]] = factor(PullMeta[[y]], levels = rev(unique(Resolutions2[[y]])))
+AdultHypo = AddMetaData(AdultHypo, PullMeta, "Clusters")  
+Clustersizes = as.data.frame(table(PullMeta[[y]]))
+
+Pull = AdultHypo@meta.data %>% group_by(Clusters, MainAssign_Nuclei) %>% dplyr::summarise("Count" = sum(count))
+Pull2 = merge(Pull, Clustersizes, by.x = "Clusters", by.y = "Var1")
+Pull2$Percent = Pull2$Count/Pull2$Freq *100
+Pull3 = Pull2 %>% group_by(Clusters) %>% top_n(n =1, wt = Percent)
+Pull3$Clusters = factor(Pull3$Clusters, levels = unique(Resolutions2[[y]]))
+Pull3 = Pull3[order(Pull3$Clusters), ]
+write.csv(Pull3, paste("TrajComp_", y, ".csv", sep=""))
+}
+
+
+
+Hicat_AssignBarcs_Nuclei = Hicat_AssignBarcs %>% dplyr::select(Hicat_Assignments)
+row.names(Hicat_AssignBarcs_Nuclei) = Hicat_AssignBarcs$Barcs
+AdultHypo = AddMetaData(AdultHypo, Hicat_AssignBarcs_Nuclei, "Hicat_AssignBarcs_Nuclei")
+
+for(y in rev(c("K6", "K16", "K28", "K40", "K55", "K116", "K169", "K199", "K229", "K285", "K341", "K391", "K444", "K494", "K560" ))){
+PullMeta = Resolutions %>% dplyr::select(y)
+PullMeta[[y]] = factor(PullMeta[[y]], levels = rev(unique(Resolutions2[[y]])))
+AdultHypo = AddMetaData(AdultHypo, PullMeta, "Clusters")  
+Clustersizes = as.data.frame(table(PullMeta[[y]]))
+
+Pull = AdultHypo@meta.data %>% group_by(Clusters, Hicat_AssignBarcs_Nuclei) %>% dplyr::summarise("Count" = sum(count))
+Pull2 = merge(Pull, Clustersizes, by.x = "Clusters", by.y = "Var1")
+Pull2$Percent = Pull2$Count/Pull2$Freq *100
+Pull3 = Pull2 %>% group_by(Clusters) %>% top_n(n =1, wt = Percent)
+Pull3$Clusters = factor(Pull3$Clusters, levels = unique(Resolutions2[[y]]))
+Pull3 = Pull3[order(Pull3$Clusters), ]
+write.csv(Pull3, paste("TrajComp_Hicat_", y, ".csv", sep=""))
+}
+
+
+K560_Annots = read.csv("~/Dropbox/LabMac/Adult_CellTypeAssigns.csv")
+
+
+CompilePctsAll = as.data.frame(matrix(ncol = 22, nrow=0))
+colnames(CompilePctsAll) = c("Level", "Cluster", "Ambiguous", "GABAergic", "Glutaminergic", "Histaminergic", "AH", "ARC", "DMH", "LH", "MERGE", "MN", "PO", "PVH", "SCN", "SMN", "TM", "Unassigned", "VMH", "ZI", "ClassOverall", "NucleiOverall")
+
+for(y in c("K6", "K16", "K28", "K40", "K55", "K116", "K169", "K199", "K229", "K285", "K341", "K391", "K444", "K494")){
+CompilePcts = as.data.frame(matrix(ncol = 21, nrow=0))
+colnames(CompilePcts) = c("Cluster","Ambiguous", "GABAergic", "Glutaminergic", "Histaminergic", "AH", "ARC", "DMH", "LH", "MERGE", "MN", "PO", "PVH", "SCN", "SMN", "TM", "Unassigned", "VMH", "ZI", "ClassOverall", "NucleiOverall")
+for(x in unique(K560_Annots[[y]])){
+PullAnnots = subset(K560_Annots, K560_Annots[[y]] == x)
+Class_Pc = PullAnnots %>% group_by(Class_K560) %>% dplyr::summarize("ClassCount" = sum(nCells)/sum(PullAnnots$nCells)*100)
+Class_PcHigh = subset(Class_Pc, Class_Pc$ClassCount > 60)
+Nuclei_Pc = PullAnnots %>% group_by(Nuclei_K560) %>% dplyr::summarize("ClassCount" = sum(nCells)/sum(PullAnnots$nCells)*100)
+colnames(Nuclei_Pc) = colnames(Class_Pc)
+Nuclei_PcHigh = subset(Nuclei_Pc, Nuclei_Pc$ClassCount > 40)
+
+All_Pc = as.data.frame(rbind(Class_Pc, Nuclei_Pc))
+row.names(All_Pc) = All_Pc$Class_K560
+All_Pc$Class_K560 = NULL
+All_Pc_t = as.data.frame(t(All_Pc))
+All_Pc_t$Cluster = x
+All_Pc_t$ClassOverall = ifelse(dim(Class_PcHigh)[1] > 0, paste(Class_PcHigh$Class_K560), "Mixed")
+All_Pc_t$NucleiOverall = ifelse(dim(Nuclei_PcHigh)[1] > 0, paste(Nuclei_PcHigh$Class_K560, collapse = "/"), "Mixed")
+CompilePcts = rbind.fill(CompilePcts, All_Pc_t)
+}
+CompilePcts[is.na(CompilePcts)] = 0
+#write.csv(CompilePcts, paste("CompilePcts_", y, ".csv", sep=""), row.names=F)
+CompilePcts$Level = y
+CompilePcts = CompilePcts[order(CompilePcts$Cluster), ]
+CompilePctsAll = rbind(CompilePctsAll, CompilePcts)
+
+}
+
+write.csv(CompilePctsAll, "CompilePctsAll.csv", row.names=F)
+
+
+## GET SECONDARY MARKERS - FOR SUPP
+Resolutions3 = Resolutions %>% dplyr::select(Compile)
+Resolutions3$Barcs = row.names(Resolutions)
+Resolutions_Assigned = merge(Resolutions3, K560_Annots, by = "Compile")
+
+Adult_NucleiAssign = Resolutions_Assigned %>% dplyr::select(K560)
+row.names(Adult_NucleiAssign) = Resolutions_Assigned$Barcs
+AdultHypo = AddMetaData(AdultHypo, Adult_NucleiAssign, "K560")
+Idents(AdultHypo) = "K560"
+DefaultAssay(AdultHypo) = "RNA"
+
+TFS = read.csv("~/Library/CloudStorage/Box-Box/HG2553 Main Folder/Useful Gene Lists/Human TFs.csv", head=F)
+NPS = read.csv("~/Dropbox/Columbia/Claudia Maria Hannah Shared/Punch Bipsies Manuscript/Neuropeptide list - 6MAR20.csv", head=F)
+ClusteringMarkers = unique(unlist(strsplit(Resolutions_Assigned$NucleiMarkers_K560, "/", fixed = TRUE)))
+
+AllTFsNPs = subset(c(TFS$V1, toupper(NPS$V1)), c(TFS$V1, toupper(NPS$V1)) %in% row.names(AdultHypo) & ! c(TFS$V1, toupper(NPS$V1)) %in% ClusteringMarkers)
+
+
+Markers = FindAllMarkers(AdultHypo, logfc.threshold = 0.25, features = AllTFsNPs)
+Markers2 = subset(Markers, Markers$p_val_adj < 0.05)
+write.csv(Markers, "AdultClustering_DEGs.csv")
+Markers = read.csv("AdultClustering_DEGs.csv")
+
+
+#Markers2 = subset(Markers, Markers$p_val_adj < 0.05 & ! Markers$gene %in% MainGenes)
+Markers3 = Markers2 %>% group_by(cluster) %>% top_n(3, wt = avg_log2FC)
+
+SecondaryMarkers = as.data.frame(matrix(ncol =2, nrow = 0))
+colnames(SecondaryMarkers) = c("NeuronalClusters", "SecondaryMarkers")
+for(x in unique(Markers3$cluster)){
+GetSecondary = subset(Markers3, Markers3$cluster %in% x)  
+GetSecondary = as.data.frame(t(c(x, paste(GetSecondary$gene, collapse="/"))))
+colnames(GetSecondary) = c("NeuronalClusters", "SecondaryMarkers")
+SecondaryMarkers = rbind(SecondaryMarkers, GetSecondary)
+}
+Resolutions_Assigned_Secondary = merge(K560_Annots, SecondaryMarkers, by.x = "K560", by.y = "NeuronalClusters")
+
+K560_Annots$count = 1
+Supp9 = K560_Annots %>% group_by(Nuclei_K560, Class_K560) %>% dplyr::summarise("Count" = sum(count), "nCells" = sum(nCells))
+
+
+#Supp Table
+AdultHypo@meta.data$SampleBroad = gsub("\\<Human HTHma\\>", "MN", gsub("\\<Human HTHma-HTHtub\\>", "TUB/MN", gsub("\\<Human HTHpo\\>", "PO", gsub("\\<Human HTHpo-HTHso\\>", "PO/SO", gsub("\\<Human HTHso\\>", "SO", gsub("\\<Human HTHso-HTHtub\\>", "SO/TUB", gsub("\\<Human HTHtub\\>", "TUB", gsub("\\<Human MN\\>", "MN", AdultHypo@meta.data$Roi))))))))
+AdultHypo@meta.data$SampleBroad = factor(AdultHypo@meta.data$SampleBroad, levels = c("PO", "PO/SO", "SO", "SO/TUB",   "TUB",   "TUB/MN",   "MN"))
+AdultHypo@meta.data$count = 1
+SupTableFig2_Dissection = AdultHypo@meta.data %>% group_by(K560, SampleBroad, .drop=FALSE) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))# %>% complete()#"Class" = unique(Class), "Nuclei" = unique(NucleiNum),
+write.csv(SupTableFig2_Dissection, "SupTableFig2_Dissection.csv")
+
+
+Nuclei_K560 = Resolutions_Assigned %>% dplyr::select("Nuclei_K560", "Barcs")
+#row.names(Nuclei_K560) = Resolutions_Assigned$Barcs
+
+
+
+##FIG 2J
+AdultHypo_UMAP = as.data.frame(AdultHypo@reductions$umap@cell.embeddings)
+write.csv(AdultHypo_UMAP, "AdultHypo_UMAP_3D.csv")
+AdultHypo_UMAPMeta = merge(Nuclei_K560, AdultHypo_UMAP, by.x = "Barcs", by.y = 0)
+#AdultHypo_UMAPMeta2 = subset(AdultHypo_UMAPMeta, ! AdultHypo_UMAPMeta$Nuclei == "Ukn")
+p = plot_ly(AdultHypo_UMAPMeta, x = ~UMAP_1, y = ~UMAP_2,  z = ~UMAP_3, size = 1, color = ~Nuclei_K560, colors = NucleiColors) 
+htmlwidgets::saveWidget(p, "./Figure2_3DUMAP_Adult.html")
+
+
+
+
+NucleiNumeric = as.data.frame(matrix(ncol = 2, nrow=0))
+colnames(NucleiNumeric) = c("K560", "NucleiNum")
+for(x in unique(K560_Annots$Nuclei_K560)){
+Pull = subset(K560_Annots, K560_Annots$Nuclei_K560 == x)
+PullTab = as.data.frame(table(Pull$K560))
+PullTab = PullTab[order(-PullTab$Freq),]
+PullTab$Num = seq(1, dim(PullTab)[1], 1)
+PullTab$Num = ifelse(PullTab$Num < 10, paste(0, PullTab$Num, sep=""), PullTab$Num)
+PullTab$NucleiNum = paste(x, PullTab$Num, sep="_")
+#Cols = rev(colorRampPalette(c("#FFFFFF", NucleiColors[[x]]))(dim(PullTab)[1]+5))[1:dim(PullTab)[1]]
+#PullTab$Color = Cols
+PullTab$Freq = NULL
+PullTab$Num = NULL
+colnames(PullTab) = c("K560", "NucleiNum")
+NucleiNumeric = rbind(NucleiNumeric, PullTab)
+}
+Resolutions$Barcs = row.names(Resolutions)
+Resolutions_Assigned_SecondaryNum = merge(Resolutions_Assigned_Secondary, NucleiNumeric, by = "K560")
+AllBarcs_Num = merge(Resolutions, Resolutions_Assigned_SecondaryNum, by = "K560")
+
+NucleiNumericAll = AllBarcs_Num %>% dplyr::select("NucleiNum", "Nuclei_K560", "Class_K560")
+row.names(NucleiNumericAll) = AllBarcs_Num$Barcs
+
+Resolutions_Assigned_SecondaryNum = merge(Resolutions_Assigned_Secondary, NucleiNumeric, by = "K560")
+write.csv(Resolutions_Assigned_SecondaryNum, "Resolutions_Assigned_Secondary.csv")
+
+######## FIG 2K
+plotGenes = c("HDC", "TBX3","ISL1",	"POMC",	"AGRP",	"GHRH",	"KISS1","HMX2","GSX1", "OTP","PCSK1", "SIM1", "POU3F2","OXT", "AVP", "CRH", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "SOX14",  "PPP1R17",  "LHX8","LHX9", "HCRT", "CARTPT", "RGS16", "SIX3", "SIX6","VAX1","RELN",  "HMX3", "CALCR",  "NFIX",  "ARX", "LHX6",  "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5",  "PITX2", "FOXP1", "FOXP2", "FOXB1", "FEZF2","MEIS2")
+
+NucleiData = AdultHypo@assays$RNA@data[plotGenes, colnames(AdultHypo)]
+NucleiData = as.data.frame(t(as.data.frame(NucleiData)))
+
+
+NucleiData2 = as.data.frame(apply(NucleiData, 2, scale))
+row.names(NucleiData2) = row.names(NucleiData)
+NucleiData3 = merge(NucleiData2, NucleiNumericAll, by = 0)
+NucleiData3$Row.names = NULL
+NucleiData4 = NucleiData3 %>% group_by(NucleiNum) %>% dplyr::summarise(across(everything(), mean))
+NucleiData4 = as.data.frame(NucleiData4)
+row.names(NucleiData4) = NucleiData4$NucleiNum
+NucleiData4$NucleiNum = NULL
+Nuclei_gath = gather(NucleiData4, Gene, Expression)
+Nuclei_gath$Cluster = row.names(NucleiData4)
+Nuclei_gath = subset(Nuclei_gath, Nuclei_gath$Gene %in% plotGenes)
+Nuclei_gath$Log2 = log2(Nuclei_gath$Expression+1)
+ExtraData = as.data.frame(matrix(ncol = 0, nrow = 12*length(plotGenes)))
+ExtraData$Gene = plotGenes
+ExtraData$Expression = NA
+ExtraData$Log2 = NA
+ExtraData$Cluster = c(rep("NA1", length(plotGenes)), rep("NA2", length(plotGenes)), rep("NA3", length(plotGenes)), rep("NA4", length(plotGenes)), rep("NA5", length(plotGenes)), rep("NA6", length(plotGenes)), rep("NA7", length(plotGenes)), rep("NA8", length(plotGenes)), rep("NA9", length(plotGenes)), rep("NA10", length(plotGenes)), rep("NA11", length(plotGenes)),rep("NA12", length(plotGenes)))
+Nuclei_gath2 = rbind(Nuclei_gath, ExtraData)
+Nuclei_gath2$Gene = factor(Nuclei_gath2$Gene, levels = rev(plotGenes))
+ORDER = c("TM_01", "TM_02", "TM_03", "TM_04", "TM_05", "TM_06", "TM_07", "TM_08", "TM_09", "TM_10", "TM_11", "TM_12", "TM_13", "TM_14", "TM_15", "NA9", 
+          "ARC_01", "ARC_02", "ARC_03", "ARC_04", "ARC_05", "ARC_06", "ARC_07", "ARC_08", "ARC_09", "ARC_10", "ARC_11", "ARC_12", "ARC_13", "ARC_14", "ARC_15", "ARC_16", "ARC_17", "ARC_18", "ARC_19", "ARC_20", "ARC_21", "ARC_22", "ARC_23", "ARC_24", "ARC_25", "ARC_26", "ARC_27", "ARC_28", "ARC_29", "ARC_30", "ARC_31", "ARC_32", "ARC_33", "ARC_34", "ARC_35", "ARC_36", "ARC_37", "ARC_38", "ARC_39", "ARC_40", "ARC_41", "ARC_42", "ARC_43", "ARC_44", "ARC_45", "ARC_46", "ARC_47", "ARC_48", "ARC_49", "ARC_50", "ARC_51", "ARC_52", "ARC_53", "ARC_54", "ARC_55", "ARC_56", "ARC_57", "ARC_58", "ARC_59", "ARC_60", "ARC_61","NA1",  "PVH_01", "PVH_02", "PVH_03", "PVH_04", "PVH_05", "PVH_06", "PVH_07", "PVH_08", "PVH_09", "PVH_10", "PVH_11", "PVH_12", "PVH_13", "PVH_14", "PVH_15", "PVH_16", "PVH_17", "PVH_18", "PVH_19", "PVH_20", "PVH_21", "PVH_22", "PVH_23", "PVH_24", "PVH_25", "PVH_26", "PVH_27", "NA7", "VMH_01", "VMH_02", "VMH_03", "VMH_04", "VMH_05", "VMH_06", "VMH_07", "VMH_08", "VMH_09", "VMH_10", "VMH_11", "VMH_12", "VMH_13", "VMH_14", "VMH_15", "VMH_16", "VMH_17", "VMH_18", "VMH_19", "VMH_20", "VMH_21", "VMH_22", "VMH_23", "VMH_24", "VMH_25", "VMH_26", "VMH_27", "VMH_28", "VMH_29", "VMH_30", "VMH_31", "VMH_32", "VMH_33", "VMH_34", "NA11", "DMH_01", "DMH_02", "DMH_03", "DMH_04", "DMH_05", "DMH_06", "DMH_07", "DMH_08", "DMH_09", "DMH_10", "DMH_11", "NA2",  "LH_01", "LH_02", "LH_03", "LH_04", "LH_05", "LH_06", "LH_07", "NA4", "SCN_01", "SCN_02", "SCN_03", "SCN_04", "SCN_05", "SCN_06", "SCN_07", "SCN_08", "SCN_09", "SCN_10", "SCN_11", "SCN_12", "SCN_13", "SCN_14", "SCN_15", "SCN_16", "SCN_17", "SCN_18", "SCN_19", "SCN_20", "SCN_21", "SCN_22",  "NA8")
+ORDER2 = c("PO_01", "PO_02", "PO_03", "PO_04", "PO_05", "PO_06", "PO_07", "PO_08", "PO_09", "PO_10", "PO_11", "PO_12", "NA12", "AH_01", "AH_02", "AH_03", "AH_04", "AH_05", "AH_06", "AH_07", "AH_08", "AH_09", "AH_10", "AH_11", "AH_12", "AH_13", "AH_14", "AH_15", "AH_16", "AH_17", "AH_18", "AH_19", "AH_20", "AH_21", "AH_22", "AH_23", "AH_24", "AH_25", "AH_26", "AH_27",   "NA6", "SMN_01", "SMN_02", "SMN_03", "SMN_04", "SMN_05", "SMN_06", "SMN_07", "SMN_08", "SMN_09", "SMN_10", "SMN_11", "SMN_12", "SMN_13", "SMN_14", "SMN_15", "SMN_16", "SMN_17", "SMN_18", "SMN_19", "SMN_20", "SMN_21", "SMN_22", "SMN_23", "SMN_24", "SMN_25", "SMN_26", "SMN_27",  "NA3",  "MN_01", "MN_02", "MN_03", "MN_04", "MN_05", "MN_06", "MN_07", "MN_08", "MN_09", "MN_10", "MN_11", "MN_12", "MN_13", "MN_14", "MN_15", "MN_16", "MN_17", "MN_18", "MN_19", "MN_20", "MN_21", "MN_22", "MN_23", "MN_24", "MN_25", "MN_26", "MN_27", "MN_28", "MN_29", "MN_30", "MN_31", "MN_32", "MN_33", "MN_34", "MN_35", "MN_36", "MN_37", "MN_38", "MN_39", "MN_40", "MN_41", "MN_42", "MN_43", "MN_44", "MN_45", "MN_46", "MN_47", "MN_48", "MN_49", "MN_50", "MN_51", "MN_52", "MN_53", "MN_54", "MN_55", "MN_56", "MN_57", "MN_58", "MN_59", "MN_60", "MN_61", "MN_62", "MN_63", "MN_64","NA5", "ZI_01", "ZI_02", "ZI_03", "ZI_04", "ZI_05", "ZI_06", "ZI_07", "ZI_08", "ZI_09", "ZI_10", "ZI_11", "ZI_12", "ZI_13", "ZI_14", "ZI_15", "ZI_16", "ZI_17", "ZI_18", "NA10", "Unassigned_01", "Unassigned_02", "Unassigned_03", "Unassigned_04", "Unassigned_05", "Unassigned_06", "Unassigned_07", "Unassigned_08", "Unassigned_09", "Unassigned_10", "Unassigned_11", "Unassigned_12", "Unassigned_13", "Unassigned_14", "Unassigned_15", "Unassigned_16", "Unassigned_17", "Unassigned_18", "Unassigned_19", "Unassigned_20", "Unassigned_21", "Unassigned_22", "Unassigned_23", "Unassigned_24", "Unassigned_25", "Unassigned_26", "Unassigned_27", "Unassigned_28", "Unassigned_29", "Unassigned_30", "Unassigned_31", "Unassigned_32", "Unassigned_33", "Unassigned_34", "Unassigned_35", "Unassigned_36", "Unassigned_37", "Unassigned_38", "Unassigned_39", "Unassigned_40", "Unassigned_41", "Unassigned_42", "Unassigned_43", "Unassigned_44")
+ORDER3 = c(ORDER, ORDER2)
+Nuclei_gath2$Cluster = factor(Nuclei_gath2$Cluster, levels = ORDER3)
+
+
+ OutputHeatMap = ggplot(Nuclei_gath2, aes(x = Gene, y = Cluster, fill = Log2)) +
+  geom_tile()+coord_flip() + scale_fill_gradient( low = "#FFFFFF", high = "#2d75a4", na.value = "#FFFFFF") + theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.title.x = element_blank(),  axis.text.x = element_blank(),  axis.text.y = element_text(face = "italic", size = 8), legend.position = "none")+  scale_y_discrete(expand=c(0, 0))
+
+pdf("Fig2_Nucleis_heatmapData.pdf", width = 5, height = 5)
+print(OutputHeatMap)
+dev.off()
+
+
+NucleiNumericAll$Dups = duplicated(NucleiNumericAll$NucleiNum)
+Annots = subset(NucleiNumericAll, NucleiNumericAll$Dups == F)
+
+Nuclei_gath_Annot = merge(Nuclei_gath, Annots, by.x = "Cluster", by.y = "NucleiNum", all.x = T)
+Nuclei_gath_Annot$Dups = duplicated(Nuclei_gath_Annot$Cluster)
+Nuclei_gath_Annot_Unique = subset(Nuclei_gath_Annot, Nuclei_gath_Annot$Dups == F)
+
+Data_HeatmapClass = Nuclei_gath_Annot_Unique %>% dplyr::select(Cluster, Class_K560)
+Data_HeatmapClass$ClassAll = "Class"
+
+ExtraData2 = as.data.frame(matrix(ncol = 0, nrow = 12*length(plotGenes)))
+ExtraData2$ClassAll = "Class"
+ExtraData2$Class_K560 = "NA"
+ExtraData2$Cluster = c("NA1", "NA2", "NA3", "NA4", "NA5", "NA6", "NA7", "NA8", "NA9", "NA10", "NA11", "NA12")
+Data_HeatmapClass2 = rbind(Data_HeatmapClass, ExtraData2)
+Data_HeatmapClass2$Cluster = factor(Data_HeatmapClass2$Cluster, levels = ORDER3)
+
+ OutputHeatMap2 = ggplot(Data_HeatmapClass2, aes(x = ClassAll, y = Cluster, fill = Class_K560)) +
+  geom_tile()+coord_flip() + scale_fill_manual(values = c("Glutaminergic" = "#d64151", "GABAergic" = "#386fa4", "Histaminergic" = "#aad576", "Unknown" = "#666666", "NA" = "#FFFFFF")) + theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.title.x = element_blank(),  axis.text.x = element_blank(),  axis.text.y = element_text(face = "italic", size = 8), legend.position = "none")+scale_x_discrete(expand=c(0, 0))+  scale_y_discrete(expand=c(0, 0))
+ 
+ 
+ Data_HeatmapNuclei = Nuclei_gath_Annot_Unique %>% dplyr::select(Cluster, Nuclei_K560)
+Data_HeatmapNuclei$NucleiAll = "Nuclei"
+
+ExtraData2 = as.data.frame(matrix(ncol = 0, nrow = 12*length(plotGenes)))
+ExtraData2$NucleiAll = "Nuclei"
+ExtraData2$Nuclei_K560 = "NA"
+ExtraData2$Cluster = c("NA1", "NA2", "NA3", "NA4", "NA5", "NA6", "NA7", "NA8", "NA9", "NA10", "NA11", "NA12")
+Data_HeatmapNuclei2 = rbind(Data_HeatmapNuclei, ExtraData2)
+Data_HeatmapNuclei2$Cluster = factor(Data_HeatmapNuclei2$Cluster, levels = ORDER3)
+
+ OutputHeatMap3 = ggplot(Data_HeatmapNuclei2, aes(x = NucleiAll, y = Cluster, fill = Nuclei_K560)) +
+  geom_tile()+coord_flip() + scale_fill_manual(values = c(NucleiColors, "NA" = "#FFFFFF")) + theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.title.x = element_blank(),  axis.text.x = element_blank(), axis.text.y = element_text(face = "italic", size = 8), legend.position = "none")+scale_x_discrete(expand=c(0, 0))+  scale_y_discrete(expand=c(0, 0))
+ 
+StackHeatmap =  ggarrange(OutputHeatMap, OutputHeatMap2, OutputHeatMap3, ncol = 1, heights = c(10,0.7, 0.7), align = "hv")
+
+pdf("Fig2_Nucleis_heatmapData_Stacked.pdf", width = 5, height = 5)
+print(StackHeatmap)
+dev.off()
+```
+
+
+
+#FIG3-ALL-CELLS
+```{r}
+##REORGANIZE METADATA
+MusRefEdKaZhou = readRDS("~/Downloads/MusRefEdKaZhouHypoNeurons_mt10_integrated.rds")
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$sample %in% grep("^10X", MusRefEdKaZhou@meta.data$sample, value = T), MusRefEdKaZhou@meta.data$Roi,  MusRefEdKaZhou@meta.data$sample)
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Aff", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [VMH]",  MusRefEdKaZhou@meta.data$NewSampleID)
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Flynn", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [VPH]",  MusRefEdKaZhou@meta.data$NewSampleID)  
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Kim", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [VMH]",  MusRefEdKaZhou@meta.data$NewSampleID)  
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Liu", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [VMH]",  MusRefEdKaZhou@meta.data$NewSampleID)  
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Mick", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [LH]",  MusRefEdKaZhou@meta.data$NewSampleID)  
+MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Morris", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [SCN]",  MusRefEdKaZhou@meta.data$NewSampleID)  
+
+MusRefEdKaZhou@meta.data$NewSampleID =  gsub("Black-E10", "Mouse Fetal [E10]",
+                                            gsub("Black-E11", "Mouse Fetal [E11]",
+                                            gsub("Black-E12", "Mouse Fetal [E12]",
+                                            gsub("Black-E13", "Mouse Fetal [E13]",
+                                            gsub("Black-E14", "Mouse Fetal [E14]",
+                                            gsub("Black-E15", "Mouse Fetal [E15]",
+                                            gsub("Black-E16", "Mouse Fetal [E16]",
+                                            gsub("Black-E16V1", "Mouse Fetal [E16]",
+                                            gsub("Black-E18", "Mouse Fetal [E18]",
+                                            gsub("Black-P14", "Mouse Postnatal [P14]",
+                                            gsub("Black-P4", "Mouse Postnatal [P4]",
+                                            gsub("Black-P45", "Mouse Adult [P45]",
+                                            gsub("Black-P45X", "Mouse Adult [P45]",
+                                            gsub("Black-P8", "Mouse Postnatal [P8]",
+                                            gsub("Cam", "Mouse Adult [ARC]",
+                                            gsub("Chen", "Mouse Adult",
+                                            gsub("CS22_2_hypo", "Human Fetal [GW10]",
+                                            gsub("CS22_hypo", "Human Fetal [GW10]",
+                                            gsub("GW10", "Human Fetal [GW10]",
+                                            gsub("GW12_01", "Human Fetal [GW12]",
+                                            gsub("GW12_02", "Human Fetal [GW12]",
+                                            gsub("GW15_A", "Human Fetal [GW15]",
+                                            gsub("GW15_M", "Human Fetal [GW15]",
+                                            gsub("GW15_P", "Human Fetal [GW15]",
+                                            gsub("GW16_hypo", "Human Fetal [GW16]",
+                                            gsub("GW18_A", "Human Fetal [GW18]",
+                                            gsub("GW18_hypo", "Human Fetal [GW18]",
+                                            gsub("GW18_Lane1", "Human Fetal [GW18]",
+                                            gsub("GW18_Lane2", "Human Fetal [GW18]",
+                                            gsub("GW18_Lane3", "Human Fetal [GW18]",
+                                            gsub("GW18_M", "Human Fetal [GW18]",
+                                            gsub("GW18_P", "Human Fetal [GW18]",
+                                            gsub("GW19_hypo", "Human Fetal [GW19]", MusRefEdKaZhou@meta.data$NewSampleID)))))))))))))))))))))))))))))))))
+MusRefEdKaZhou@meta.data$NewSampleID =   gsub("GW20_34_hypo", "Human Fetal [GW20]", 
+                                            gsub("GW20_A", "Human Fetal [GW20]",
+                                            gsub("GW20_M", "Human Fetal [GW20]",
+                                            gsub("GW20_P", "Human Fetal [GW20]",
+                                            gsub("GW22T_hypo1", "Human Fetal [GW22]",
+                                            gsub("GW25_3V_hypo", "Human Fetal [GW25]",
+                                            gsub("Mof", "Mouse Adult [PO]",
+                                            gsub("Romanov-E15", "Mouse Fetal [E15]",
+                                            gsub("Romanov-E17", "Mouse Fetal [E17]",
+                                            gsub("Romanov-P0", "Mouse Postnatal [P0]",
+                                            gsub("Romanov-P10", "Mouse Postnatal [P10]",
+                                            gsub("Romanov-P2", "Mouse Postnatal [P2]",
+                                            gsub("Romanov-P23", "Mouse Adult",
+                                            gsub("Wen", "Mouse Adult [SCN]",
+                                            gsub("Human HTHma", "Human Adult [MN]",
+                                            gsub("Human HTHma-HTHtub", "Human Adult [MN/TUB]",
+                                            gsub("Human HTHpo", "Human Adult [PO]",
+                                            gsub("Human HTHpo-HTHso", "Human Adult [PO/SO]",
+                                            gsub("Human HTHso", "Human Adult [SO]",
+                                            gsub("Human HTHso-HTHtub", "Human Adult [SO/TUB]",
+                                            gsub("Human HTHtub", "Human Adult [TUB]",
+                                            gsub("Human MN", "Human Adult [MN]", MusRefEdKaZhou@meta.data$NewSampleID))))))))))))))))))))))
+                                                 
+MusRefEdKaZhou$SamplesBroad = gsub(" \\[.*", "", MusRefEdKaZhou@meta.data$NewSampleID)
+
+########
+
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$sample %in% grep("^10X", MusRefEdKaZhou@meta.data$sample, value = T), "Siletti [Human Adult]",  MusRefEdKaZhou@meta.data$sample)
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("^Aff", MusRefEdKaZhou@meta.data$sample, value = T), "Affinati [Mouse Adult VMH]",  MusRefEdKaZhou@meta.data$StudyAll)
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("^Flynn", MusRefEdKaZhou@meta.data$sample, value = T), "Flynn [Mouse Adult VPH]",  MusRefEdKaZhou@meta.data$StudyAll)  
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("^Kim", MusRefEdKaZhou@meta.data$sample, value = T), "Kim [Mouse Adult VMH]",  MusRefEdKaZhou@meta.data$StudyAll)  
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("^Liu", MusRefEdKaZhou@meta.data$sample, value = T), "Liu [Mouse Adult VMH]",  MusRefEdKaZhou@meta.data$StudyAll)  
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("^Mick", MusRefEdKaZhou@meta.data$sample, value = T), "Mickelsen [Mouse Adult LH]",  MusRefEdKaZhou@meta.data$StudyAll)  
+MusRefEdKaZhou@meta.data$StudyAll = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("^Morris", MusRefEdKaZhou@meta.data$sample, value = T), "Morris [Mouse Adult SCN]",  MusRefEdKaZhou@meta.data$StudyAll)  
+
+MusRefEdKaZhou@meta.data$StudyAll =  gsub("Mof", "Moffit [Mouse Adult PO]", 
+                                          gsub("Black-E10", "Kim [Mouse Development]",
+                                            gsub("Black-E11", "Kim [Mouse Development]",
+                                            gsub("Black-E12", "Kim [Mouse Development]",
+                                            gsub("Black-E13", "Kim [Mouse Development]",
+                                            gsub("Black-E14", "Kim [Mouse Development]",
+                                            gsub("Black-E15", "Kim [Mouse Development]",
+                                            gsub("Black-E16", "Kim [Mouse Development]",
+                                            gsub("Black-E16V1", "Kim [Mouse Development]",
+                                            gsub("Black-E18", "Kim [Mouse Development]",
+                                            gsub("Black-P14", "Kim [Mouse Development]",
+                                            gsub("Black-P4", "Kim [Mouse Development]",
+                                            gsub("Black-P45", "Kim [Mouse Development]",
+                                            gsub("Black-P45X", "Kim [Mouse Development]",
+                                            gsub("Black-P8", "Kim [Mouse Development]",
+                                            gsub("Cam", "Campbell [Mouse Adult ARC]",
+                                            gsub("Chen", "Chen [Mouse Adult]",
+                                            gsub("CS22_2_hypo", "Herb [Human Fetal]",
+                                            gsub("CS22_hypo", "Herb [Human Fetal]",
+                                            gsub("GW10", "Zhao [Human Fetal]",
+                                            gsub("GW12_01", "Zhao [Human Fetal]",
+                                            gsub("GW12_02", "Zhao [Human Fetal]",
+                                            gsub("GW15_A", "Zhao [Human Fetal]",
+                                            gsub("GW15_M", "Zhao [Human Fetal]",
+                                            gsub("GW15_P", "Zhao [Human Fetal]",
+                                            gsub("GW16_hypo", "Herb [Human Fetal]",
+                                            gsub("GW18_A", "Zhao [Human Fetal]",
+                                            gsub("GW18_hypo", "Herb [Human Fetal]",
+                                            gsub("GW18_Lane1", "Zhao [Human Fetal]",
+                                            gsub("GW18_Lane2", "Zhao [Human Fetal]",
+                                            gsub("GW18_Lane3", "Zhao [Human Fetal]",
+                                            gsub("GW18_M", "Zhao [Human Fetal]",
+                                            gsub("GW18_P", "Zhao [Human Fetal]",
+                                            gsub("GW19_hypo", "Herb [Human Fetal]", MusRefEdKaZhou@meta.data$StudyAll))))))))))))))))))))))))))))))))))
+MusRefEdKaZhou@meta.data$StudyAll =   gsub("GW20_34_hypo", "Herb [Human Fetal]", 
+                                            gsub("GW20_A", "Zhao [Human Fetal]",
+                                            gsub("GW20_M", "Zhao [Human Fetal]",
+                                            gsub("GW20_P", "Zhao [Human Fetal]",
+                                            gsub("GW22T_hypo1", "Herb [Human Fetal]",
+                                            gsub("GW25_3V_hypo", "Herb [Human Fetal]",
+                                            gsub("Romanov-E15", "Romanov [Mouse Development]",
+                                            gsub("Romanov-E17", "Romanov [Mouse Development]",
+                                            gsub("Romanov-P0", "Romanov [Mouse Development]",
+                                            gsub("Romanov-P10", "Romanov [Mouse Development]",
+                                            gsub("Romanov-P2", "Romanov [Mouse Development]",
+                                            gsub("Romanov-P23", "Romanov [Mouse Development]",
+                                            gsub("Wen", "Wen [Mouse Adult SCN]", MusRefEdKaZhou@meta.data$StudyAll)))))))))))))
+
+MusRefEdKaZhou@meta.data$StudyAll = factor(MusRefEdKaZhou@meta.data$StudyAll, levels = names(Fig3_Colors_Study))
+
+MusRefEdKaZhou@meta.data$count = 1
+SupTableFig3 = MusRefEdKaZhou@meta.data %>% group_by(StudyAll, NewSampleID) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableFig3, "SupTableFig3.csv", row.names=F)
+
+SupTableFig3_Clusters = MusRefEdKaZhou@meta.data %>% group_by(seurat_clusters) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableFig3_Clusters, "SupTableFig3_Clusters.csv", row.names=F)
+
+###### FIG 3A
+Idents(MusRefEdKaZhou) = "StudyAll"
+Fig3_UMAP = DimPlot(MusRefEdKaZhou, cols = Fig3_Colors_Study) +theme(axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666"), axis.text = element_text(color = "#666666"),  axis.title = element_text(color = "#666666")) + NoLegend()
+pdf("Fig3_SampleStudy_UMAP.pdf", width = 8, height =8)
+print(Fig3_UMAP)
+dev.off()
+
+
+
+###### FIG 3B
+MusRefEdKaZhou@meta.data$SamplesBroad2 = gsub("Mouse Fetal", "Mouse Development", gsub("Mouse Postnatal", "Mouse Development", MusRefEdKaZhou@meta.data$SamplesBroad))
+MusRefEdKaZhou@meta.data$SamplesBroad2 = factor(MusRefEdKaZhou@meta.data$SamplesBroad2, levels = c("Mouse Development", "Mouse Adult", "Human Fetal", "Human Adult"))
+
+Idents(MusRefEdKaZhou) = "SamplesBroad2"
+Fig3_UMAP = DimPlot(MusRefEdKaZhou, cols = c("Mouse Development" = DarkPink, "Mouse Adult"= GreenLighest,"Human Fetal"  = BlueLighest, "Human Adult" = DarkPurple), split.by = "SamplesBroad2", ncol = 2) +theme(axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666"), axis.text = element_text(color = "#666666"),  axis.title = element_text(color = "#666666"))+ NoLegend()
+pdf("Fig3_SampleSplit_UMAP.pdf", width = 8, height =8)
+print(Fig3_UMAP)
+dev.off()
+
+###### FIG 3C
+DefaultAssay(MusRefEdKaZhou) = "SCT"
+Fig3_FP = FeaturePlot(MusRefEdKaZhou, c("SLC32A1","SLC17A6", "HDC"), ncol =1)
+for(x in seq(1,3,1)){
+Fig3_FP[[x]] = Fig3_FP[[x]] +theme(axis.line = element_blank(),  axis.ticks = element_blank(), axis.text = element_blank(),  axis.title = element_blank(), plot.title = element_text(size = 12, face = "italic", hjust=0))+ NoLegend()+scale_color_gradientn(colours = c("lightgrey", GreenDark))
+}
+
+pdf("Fig3_NeuronType_FP.pdf", width = 3, height =8)
+print(Fig3_FP)
+dev.off()
+
+## FIG 3D
+NewCols = Fig3_Colors_Study
+names(NewCols) = NULL
+Idents(MusRefEdKaZhou) = "seurat_clusters"
+Fig3_Clusts = DimPlot(MusRefEdKaZhou, cols = Fig3_SeuColors, label=T) +theme(axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666"), axis.text = element_text(color = "#666666"),  axis.title = element_text(color = "#666666")) + NoLegend()
+pdf("Fig3_SeuClusters.pdf", width = 8, height =8)
+print(Fig3_Clusts)
+dev.off()
+
+### SUPP
+DefaultAssay(MusRefEdKaZhou) = "RNA"
+Idents(MusRefEdKaZhou) = "seurat_clusters"
+
+
+DotP= DotPlot(MusRefEdKaZhou, assay = "RNA", features = c("HDC", "TBX3","ISL1",	"POMC",	"AGRP",	"GHRH",	"KISS1","HMX2","GSX1", "OTP","PCSK1", "SIM1", "POU3F2","OXT", "AVP", "CRH", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "SOX14",  "PPP1R17",  "LHX8","LHX9", "HCRT", "CARTPT", "RGS16", "SIX3", "SIX6","VAX1","RELN",  "HMX3", "CALCR",  "NFIX",  "ARX", "LHX6",  "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5",  "PITX2", "FOXP1", "FOXP2", "FOXB1", "FEZF2","MEIS2"),  cols = c("#FFFFFF", HeatmapBlue), dot.min = 0.0, col.min=0, dot.scale	=6) + theme(axis.text.y = element_text(face="italic"))  + ylab("")+xlab("")+coord_flip()
+
+pdf("Fig3_SeuClusters_DotPlot.pdf", width = 12, height =12)
+print(DotP)
+dev.off()
+
+
+##### FIG 3E
+All.integrated_nsamples = as.data.frame(table(MusRefEdKaZhou@meta.data$StudyAll))
+
+CompilePercents = as.data.frame(matrix(ncol =7, nrow=0))
+colnames(CompilePercents) = c("SampleType", "nCluster", "nTotal", "PercentAll", "PercentClust_All",  "Cluster")
+for(x in unique(MusRefEdKaZhou@meta.data$seurat_clusters)){
+Subs= subset(MusRefEdKaZhou@meta.data, MusRefEdKaZhou@meta.data$seurat_clusters == x) 
+MetaTable = as.data.frame(table(Subs$StudyAll))
+MetaTable2 = merge(MetaTable, All.integrated_nsamples, by = "Var1", all = T)
+MetaTable2[is.na(MetaTable2)] = 0
+colnames(MetaTable2) = c("SampleType", "nCluster", "nTotal")
+MetaTable2$nCluster = as.numeric(MetaTable2$nCluster)
+MetaTable2$nTotal = as.numeric(MetaTable2$nTotal)
+MetaTable2[is.na(MetaTable2)] = 0
+MetaTable2$PercentAll = MetaTable2$nCluster/MetaTable2$nTotal
+MetaTable2$PercentClust_All = MetaTable2$PercentAll/sum(MetaTable2$PercentAll)*100
+MetaTable2[is.na(MetaTable2)] = 0
+MetaTable2$Cluster = x
+CompilePercents = rbind(CompilePercents, MetaTable2)
+}
+
+CompilePercents$SampleType = factor(CompilePercents$SampleType, levels = names(Fig3_Colors_Study))
+CompilePercents$Cluster = factor(CompilePercents$Cluster, levels = seq(0,34, 1))
+  #axis.text = element_text(size = 16), axis.title.y = element_text(size = 16)
+Seu_NormalizedPercent = ggplot(CompilePercents, aes(fill=SampleType, y=PercentClust_All, x=Cluster)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", legend.title = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5)) + scale_fill_manual(values = Fig3_Colors_Study)
+pdf("Fig3_SeuClustersPercents.pdf", width = 10, height =4)
+print(Seu_NormalizedPercent)
+dev.off()
+
+
+GeneLists = list()
+GeneLists[["JustPOMC"]] = "POMC"
+POMC_Clust = subset(MusRefEdKaZhou, idents = 13)
+POMC_Rest = subset(MusRefEdKaZhou, idents = 13, invert=T)
+FeaturePlot(POMC_Clust, "POMC")
+set.dim = 30
+set.res =1
+set.kparam = c(20,50, 100)
+
+DefaultAssay(POMC_Clust) = "integrated"
+POMC_Clust <- FindNeighbors(POMC_Clust, k.param=10, dims=1:30)
+POMC_Clust <- FindClusters(POMC_Clust, resolution = 3)
+DefaultAssay(POMC_Clust) = "RNA"
+VlnPlot(POMC_Clust, "POMC", pt.size = 0)
+
+POMC_Clus3 = subset(POMC_Clust, idents = c(0,2,3,5, 8,9,10,12,14,15,17,18,20,22,23,24,25,27,28,29)) #2666
+FeaturePlot(POMC_Clus3, "POMC")
+DefaultAssay(POMC_Clus3) = "integrated"
+POMC_Clus3 <- FindNeighbors(POMC_Clus3, k.param=5, dims=1:30)
+POMC_Clus3 <- FindClusters(POMC_Clus3, resolution = 1)
+DefaultAssay(POMC_Clus3) = "RNA"
+VlnPlot(POMC_Clus3, "POMC", pt.size = 0)
+DimPlot(POMC_Clus3, label=T)
+POMC_Clust4 = subset(POMC_Clus3, idents = c(3,0,5), invert=T) #2488
+Idents(POMC_Clust4) = "StudyAll"
+VlnPlot(POMC_Clust4, "POMC", pt.size = 0)
+POMC_Clust5 = subset(POMC_Clust4, idents = c("Moffit [Mouse Adult PO]",  "Mickelsen [Mouse Adult LH]"), invert=T) #2488
+
+
+
+############################################################################################################
+POMC_Low_Orig = readRDS("~/Dropbox/LabMac/MMHSpomcNeurons_mt10_integrated.rds")
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$sample %in% grep("^10X", POMC_Low_Orig@meta.data$sample, value = T), "Siletti [Human Adult]",  POMC_Low_Orig@meta.data$sample)
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$StudyAll %in% grep("^Aff", POMC_Low_Orig@meta.data$sample, value = T), "Affinati [Mouse Adult VMH]",  POMC_Low_Orig@meta.data$StudyAll)
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$StudyAll %in% grep("^GSM", POMC_Low_Orig@meta.data$sample, value = T), "Yu [Mouse Adult POMC+]",  POMC_Low_Orig@meta.data$StudyAll)  
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$StudyAll %in% grep("^Kim", POMC_Low_Orig@meta.data$sample, value = T), "Kim [Mouse Adult VMH]",  POMC_Low_Orig@meta.data$StudyAll)  
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$StudyAll %in% grep("^Liu", POMC_Low_Orig@meta.data$sample, value = T), "Liu [Mouse Adult VMH]",  POMC_Low_Orig@meta.data$StudyAll)  
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$StudyAll %in% grep("^Cam", POMC_Low_Orig@meta.data$sample, value = T), "Campbell [Mouse Adult ARC]",  POMC_Low_Orig@meta.data$StudyAll)  
+POMC_Low_Orig@meta.data$StudyAll = ifelse(POMC_Low_Orig@meta.data$StudyAll %in% grep("^Romanov", POMC_Low_Orig@meta.data$sample, value = T), "Romanov [Mouse Development]",  POMC_Low_Orig@meta.data$StudyAll)  
+POMC_Low_Orig@meta.data$StudyAll =  gsub("GW10", "Zhao [Human Fetal]",gsub("GW12_01", "Zhao [Human Fetal]",gsub("GW15_P", "Zhao [Human Fetal]", gsub("Black-E12", "Kim [Mouse Development]", gsub("CS22_hypo", "Herb [Human Fetal]", gsub("GW18_hypo", "Herb [Human Fetal]",  POMC_Low_Orig@meta.data$StudyAll))))))
+       
+
+
+Idents(POMC_Low_Orig) = "seurat_clusters"
+DimPlot(POMC_Low_Orig, label=T)
+
+POMC_Low_UMAP = as.data.frame(POMC_Low_Orig@reductions$umap@cell.embeddings)
+CellsRm = subset(POMC_Low_UMAP, POMC_Low_UMAP$UMAP_1 < -5 & POMC_Low_UMAP$UMAP_2 < 0.8 | POMC_Low_UMAP$UMAP_1 > 5 | POMC_Low_UMAP$UMAP_1 < 0.2 & POMC_Low_UMAP$UMAP_2 < -4.7)
+
+CheckInput = CellsRm
+CheckUMAP(POMC_Low_Orig)
+
+POMC_high = subset(POMC_Low_Orig, cells = row.names(CellsRm), invert=T)
+Idents(POMC_high) = "StudyAll"
+################################################################################################
+
+POMCNeur_V2 = readRDS("~/Downloads/Hannah_Low_MMHSpomcNeurons_mt10_integrated.rds")
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$sample %in% grep("^10X", POMCNeur_V2@meta.data$sample, value = T), "Siletti [Human Adult]",  POMCNeur_V2@meta.data$sample)
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$StudyAll %in% grep("^Aff", POMCNeur_V2@meta.data$sample, value = T), "Affinati [Mouse Adult VMH]",  POMCNeur_V2@meta.data$StudyAll)
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$StudyAll %in% grep("^GSM", POMCNeur_V2@meta.data$sample, value = T), "Yu [Mouse Adult POMC+]",  POMCNeur_V2@meta.data$StudyAll)  
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$StudyAll %in% grep("^Kim", POMCNeur_V2@meta.data$sample, value = T), "Kim [Mouse Adult VMH]",  POMCNeur_V2@meta.data$StudyAll)  
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$StudyAll %in% grep("^Liu", POMCNeur_V2@meta.data$sample, value = T), "Liu [Mouse Adult VMH]",  POMCNeur_V2@meta.data$StudyAll)  
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$StudyAll %in% grep("^Cam", POMCNeur_V2@meta.data$sample, value = T), "Campbell [Mouse Adult ARC]",  POMCNeur_V2@meta.data$StudyAll)  
+POMCNeur_V2@meta.data$StudyAll = ifelse(POMCNeur_V2@meta.data$StudyAll %in% grep("^Romanov", POMCNeur_V2@meta.data$sample, value = T), "Romanov [Mouse Development]",  POMCNeur_V2@meta.data$StudyAll)  
+POMCNeur_V2@meta.data$StudyAll =  gsub("GW10", "Zhao [Human Fetal]",gsub("GW12_01", "Zhao [Human Fetal]",gsub("GW15_P", "Zhao [Human Fetal]", gsub("Black-E12", "Kim [Mouse Development]", gsub("CS22_hypo", "Herb [Human Fetal]", gsub("GW18_hypo", "Herb [Human Fetal]",  POMCNeur_V2@meta.data$StudyAll))))))
+       
+POMCNeur_Extras = subset(POMCNeur_V2, cells = colnames(POMC_high), invert=T)
+Idents(POMCNeur_Extras) = "StudyAll"
+POMCNeur_Extras_v2 = subset(POMCNeur_Extras, idents = c("Yu [Mouse Adult POMC+]" ), invert=T)
+
+
+POMC_Clust5
+
+
+
+features <- SelectIntegrationFeatures(object.list = list(POMC_high, POMCNeur_Extras_v2))
+POMC.anchors <- FindIntegrationAnchors(object.list = list(POMC_high, POMCNeur_Extras_v2), anchor.features = features)
+POMC.combined <- IntegrateData(anchorset = POMC.anchors)
+
+#POMC_All <- merge(POMC_high, y = POMCNeur_Extras_v2, add.cell.ids = c("Orig", "Additional"), project = "POMC_All", merge.data = TRUE)
+#POMC_All <- NormalizeData(POMC_All)
+#POMC_All <- FindVariableFeatures(POMC_All, do.plot = F, verbose = F)
+MT.genes <- grep(pattern = "^MT-", x = rownames(x = POMC.combined), value = TRUE)
+
+percent.mt <- Matrix::colSums(POMC.combined@assays[["RNA"]][MT.genes, ])/Matrix::colSums(POMC.combined@assays[["RNA"]])
+POMC.combined  = AddMetaData(POMC.combined, percent.mt, "percent.mt")
+POMC.combined = ScaleData(POMC.combined, vars.to.regress = c("percent.mt"), verbose = F)
+POMC.combined = RunPCA(POMC.combined, verbose = F, npcs = 10)
+POMC.combined = RunUMAP(POMC.combined, dims = 1:10, verbose = F)
+DimPlot(POMC.combined)
+
+
+POMC.list <- SplitObject(POMC.combined, split.by = "StudyAll")
+POMC.list <- lapply(X = POMC.list, FUN = SCTransform)
+features <- SelectIntegrationFeatures(object.list = POMC.list, nfeatures = 3000)
+POMC.list <- PrepSCTIntegration(object.list = POMC.list, anchor.features = features)
+POMC.anchors <- FindIntegrationAnchors(object.list = POMC.list, normalization.method = "SCT",
+    anchor.features = features, dims = 1:20, k.filter = 100, k.score = 20)
+POMC.combined.sct <- IntegrateData(anchorset = POMC.anchors, normalization.method = "SCT", dims = 1:20, k.weight = 20)
+POMC.combined.sct <- RunPCA(POMC.combined.sct, verbose = FALSE)
+POMC.combined.sct <- RunUMAP(POMC.combined.sct, reduction = "pca", dims = 1:30)
+p1 <- DimPlot(POMC.combined.sct, reduction = "umap", group.by = "StudyAll")
+DefaultAssay(POMC.combined.sct) = "RNA"
+FeaturePlot(POMC.combined.sct, c("POMC", "OTP", "SST", "PCSK1", "PRDM12"))
+```
+
+#FIG3-POMC-YU-INTEGRATION
+```{r}
+#Brians integration of Hannah's Assignments (w/out Low)
+#Plus Low Data from Brians cleaned version cleaned 
+
+POMC_ExLow = readRDS("~/Downloads/Hannah_MMHSpomcNeurons_mt10_integrated.rds")
+POMC_ExLow@meta.data$StudyAll = ifelse(POMC_ExLow@meta.data$sample %in% grep("^10X", POMC_ExLow@meta.data$sample, value = T), "Siletti [Human Adult]",  POMC_ExLow@meta.data$sample)
+POMC_ExLow@meta.data$StudyAll = ifelse(POMC_ExLow@meta.data$StudyAll %in% grep("^Aff", POMC_ExLow@meta.data$sample, value = T), "Affinati [Mouse Adult VMH]",  POMC_ExLow@meta.data$StudyAll)
+POMC_ExLow@meta.data$StudyAll = ifelse(POMC_ExLow@meta.data$StudyAll %in% grep("^Kim", POMC_ExLow@meta.data$sample, value = T), "Kim [Mouse Adult VMH]",  POMC_ExLow@meta.data$StudyAll)  
+POMC_ExLow@meta.data$StudyAll = ifelse(POMC_ExLow@meta.data$StudyAll %in% grep("^Liu", POMC_ExLow@meta.data$sample, value = T), "Liu [Mouse Adult VMH]",  POMC_ExLow@meta.data$StudyAll)  
+POMC_ExLow@meta.data$StudyAll = ifelse(POMC_ExLow@meta.data$StudyAll %in% grep("^Cam", POMC_ExLow@meta.data$sample, value = T), "Campbell [Mouse Adult ARC]",  POMC_ExLow@meta.data$StudyAll)  
+POMC_ExLow@meta.data$StudyAll = ifelse(POMC_ExLow@meta.data$StudyAll %in% grep("^Romanov", POMC_ExLow@meta.data$sample, value = T), "Romanov [Mouse Development]",  POMC_ExLow@meta.data$StudyAll)  
+POMC_ExLow@meta.data$StudyAll =  gsub("GW10", "Zhao [Human Fetal]",gsub("GW12_01", "Zhao [Human Fetal]",gsub("GW15_P", "Zhao [Human Fetal]", gsub("Black-E12", "Kim [Mouse Development]", gsub("CS22_hypo", "Herb [Human Fetal]", gsub("GW18_hypo", "Herb [Human Fetal]",  POMC_ExLow@meta.data$StudyAll))))))
+       
+
+POMC_ForLowOnly = readRDS("~/Dropbox/LabMac/MMHSpomcNeurons_mt10_integrated.rds")
+
+POMC_Low_UMAP = as.data.frame(POMC_ForLowOnly@reductions$umap@cell.embeddings)
+CellsRm = subset(POMC_Low_UMAP, POMC_Low_UMAP$UMAP_1 < -5 & POMC_Low_UMAP$UMAP_2 < 0.8 | POMC_Low_UMAP$UMAP_1 > 5 | POMC_Low_UMAP$UMAP_1 < 0.2 & POMC_Low_UMAP$UMAP_2 < -4.7)
+POMC_ForLowOnly_V2 = subset(POMC_ForLowOnly, cells = row.names(CellsRm), invert=T)
+Idents(POMC_ForLowOnly_V2) = "sample"
+POMC_ForLowOnly_V3 = subset(POMC_ForLowOnly_V2, idents = unique(grep("^GSM", POMC_ForLowOnly_V2@meta.data$sample, value = T)))
+POMC_ForLowOnly_V3@meta.data$StudyAll = "Yu [Mouse Adult POMC+]"
+
+POMC.list = list(POMC_ExLow, POMC_ForLowOnly_V3)
+
+POMC.list.combo = merge(POMC_ExLow, y = POMC_ForLowOnly_V3, add.cell.ids = c("Orig", "Low"), project = "POMC_All", merge.data = TRUE)
+ifnb.list <- lapply(X = ifnb.list, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+POMC.list <- SplitObject(POMC.list.combo, split.by = "StudyAll")
+POMC.list <- lapply(X = POMC.list, FUN = SCTransform)
+features <- SelectIntegrationFeatures(object.list = POMC.list, nfeatures = 3000)
+POMC.list <- PrepSCTIntegration(object.list = POMC.list, anchor.features = features)
+POMC.anchors <- FindIntegrationAnchors(object.list = POMC.list, normalization.method = "SCT",
+    anchor.features = features, dims = 1:20, k.score = 20)
+POMC.combined.sct <- IntegrateData(anchorset = POMC.anchors, normalization.method = "SCT", dims = 1:20, k.weight = 20)
+POMC.combined.sct <- RunPCA(POMC.combined.sct, verbose = FALSE)
+POMC.combined.sct <- RunUMAP(POMC.combined.sct, reduction = "pca", dims = 1:30)
+p1 <- DimPlot(POMC.combined.sct, reduction = "umap", group.by = "StudyAll")
+DefaultAssay(POMC.combined.sct) = "SCT"
+FeaturePlot(POMC.combined.sct, c("POMC", "OTP", "SST", "PCSK1", "PRDM12"))
+
+DefaultAssay(POMC.combined.sct) = "SCT"
+pdf("Fig3_YuPOMCInt_FeatPlots.pdf", width = 20, height =20)
+print(FeaturePlot(POMC.combined.sct, c("NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "PRDM12", "HDC", "GLIPR1", "ANXA2", "TTR", "PRLR")))
+dev.off()
+
+
+DefaultAssay(POMC.combined.sct) = "integrated"
+POMC.combined.sct <- FindNeighbors(POMC.combined.sct, k.param=20, dims=1:30)
+POMC.combined.sct <- FindClusters(POMC.combined.sct, resolution = 1)
+DefaultAssay(POMC.combined.sct) = "SCT"
+FeaturePlot(POMC.combined.sct, c("POMC"))
+DimPlot(POMC.combined.sct, label=T)
+
+POMC.combined.sct_V2 = subset(POMC.combined.sct, idents = c(6,14,16), invert=T)
+FeaturePlot(POMC.combined.sct_V2, c("POMC"))
+
+saveRDS(POMC.combined.sct_V2, file = "POMC.combined.sct_V2.rds")
+POMC.combined.sct_V2 = readRDS("POMC.combined.sct_V2.rds")
+
+DPlist2 = list()
+DPlist = list()
+FPlist = list()
+Filename = ""
+for(y in seq(10,30,10)){
+DefaultAssay(POMC.combined.sct_V2) = "integrated"
+POMC.combined.sct_V2 = RunPCA(POMC.combined.sct_V2, npcs = y)
+for(z in seq(10,y,10)){
+for(s in c(2,5,10)){
+DefaultAssay(POMC.combined.sct_V2) = "integrated"
+POMC.combined.sct_V2 <- RunUMAP(POMC.combined.sct_V2,dims = 1:z, spread= s)
+DefaultAssay(POMC.combined.sct_V2) = "SCT"
+
+FPlist[[paste("PCA", y, "_dims", z, "_spread", s)]] = FeaturePlot(POMC.combined.sct_V2, c("NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "PRDM12", "HDC", "GLIPR1", "ANXA2", "TTR", "PRLR"), reduction="umap") 
+
+DPlist[[paste("PCA", y, "_dims", z, "_spread", s)]] = DimPlot(POMC.combined.sct_V2, reduction="umap", split.by = "StudyAll") + labs(title = paste("PCA", y, "_dims", z, "_spread", s))
+
+DPlist2[[paste("PCA", y, "_dims", z, "_spread", s)]] = DimPlot(POMC.combined.sct_V2, reduction="umap", group.by = "StudyAll", label=T) + labs(title = paste("PCA", y, "dims", z, "spread", s))
+}}}  
+pdf(paste("POMCANALYSIS5", Filename, "_FeaturePlots.pdf", sep=""), width=26, height=20)
+print(FPlist)
+dev.off()
+
+pdf(paste("POMCANALYSIS5", Filename, "_SPLITUMAP.pdf", sep=""), width=50, height=5)
+print(DPlist)
+dev.off()
+
+pdf(paste("POMCANALYSIS5", Filename, "_GROUPUMAP.pdf", sep=""), width=8, height=5)
+print(DPlist2)
+dev.off()
+
+
+#use 2
+POMC.combined.sct_V2 = readRDS("~/Dropbox/LabMac/POMC.combined.sct_V2.rds")
+
+DefaultAssay(POMC.combined.sct_V2) = "RNA"
+POMC.combined.sct_V2 = NormalizeData(POMC.combined.sct_V2)
+
+DefaultAssay(POMC.combined.sct_V2) = "integrated"
+POMC.combined.sct_V2 = RunPCA(POMC.combined.sct_V2, npcs = 10) 
+POMC.combined.sct_V2 <- RunUMAP(POMC.combined.sct_V2,dims = 1:10, spread= 5)
+DefaultAssay(POMC.combined.sct_V2) = "SCT"
+
+GeneLists[["ARC"]] = c("NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "PRDM12", "HDC", "GLIPR1", "ANXA2", "TTR", "PRLR")
+set.res =1
+set.dim =10
+set.kparam = c(20, 50)
+#ClusterFunc_All_RNA(POMC.combined.sct_V2)
+POMC.combined.sct_V2_UMAP = as.data.frame(POMC.combined.sct_V2@reductions$umap@cell.embeddings)
+
+DefaultAssay(POMC.combined.sct_V2) = "integrated"
+POMC.combined.sct_V2 <- FindNeighbors(POMC.combined.sct_V2, k.param=100, dims=1:10)
+POMC.combined.sct_V2 <- FindClusters(POMC.combined.sct_V2, resolution = 1)
+DefaultAssay(POMC.combined.sct_V2) = "RNA"
+
+Clust1 = subset(POMC.combined.sct_V2, idents = 0)
+Clust1_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust1) & POMC.combined.sct_V2_UMAP$UMAP_2 > -3)
+Clust1_Add = subset(POMC.combined.sct_V2_UMAP, POMC.combined.sct_V2_UMAP$UMAP_2 > 3 & POMC.combined.sct_V2_UMAP$UMAP_1 < -3)
+Clust1_Clean =   subset(POMC.combined.sct_V2, cells = unique(c(row.names(Clust1_Keep), row.names(Clust1_Add))))
+
+
+Clust2 = subset(POMC.combined.sct_V2, idents = 9)
+Clust2_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust2) & POMC.combined.sct_V2_UMAP$UMAP_2 < 10 & POMC.combined.sct_V2_UMAP$UMAP_1 < 15 & POMC.combined.sct_V2_UMAP$UMAP_1 > -3)
+Clust2_Add = subset(POMC.combined.sct_V2_UMAP, POMC.combined.sct_V2_UMAP$UMAP_2 > -2.5 & POMC.combined.sct_V2_UMAP$UMAP_2 < 10 & POMC.combined.sct_V2_UMAP$UMAP_1 < 14 & POMC.combined.sct_V2_UMAP$UMAP_1 > -3)
+Clust2_Clean =   subset(POMC.combined.sct_V2, cells = unique(c(row.names(Clust2_Keep), row.names(Clust2_Add))))
+
+
+POMC.combined.Rest = subset(POMC.combined.sct_V2, cells = c(colnames(Clust1_Clean), colnames(Clust2_Clean)), invert=T)
+
+set.kparam = c(20)
+#ClusterFunc_All_RNA(POMC.combined.Rest)
+
+DefaultAssay(POMC.combined.Rest) = "integrated"
+POMC.combined.Rest <- FindNeighbors(POMC.combined.Rest, k.param=20, dims=1:10)
+POMC.combined.Rest <- FindClusters(POMC.combined.Rest, resolution = 1)
+DefaultAssay(POMC.combined.Rest) = "RNA"
+
+Clust3 = subset(POMC.combined.Rest, idents = 4)
+Clust3_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust3) & POMC.combined.sct_V2_UMAP$UMAP_2 < -11 & POMC.combined.sct_V2_UMAP$UMAP_1 < 26)
+Clust3_Add = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest) & POMC.combined.sct_V2_UMAP$UMAP_2 < -16 & POMC.combined.sct_V2_UMAP$UMAP_1 < 23 & POMC.combined.sct_V2_UMAP$UMAP_1 > 11 | row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest) & POMC.combined.sct_V2_UMAP$UMAP_2 < -13 & POMC.combined.sct_V2_UMAP$UMAP_1 < 25 & POMC.combined.sct_V2_UMAP$UMAP_1 > 15)
+Clust3_Clean =   subset(POMC.combined.Rest, cells = unique(c(row.names(Clust3_Keep), row.names(Clust3_Add))))
+
+
+Clust4 = subset(POMC.combined.Rest, idents = 11)
+Clust4_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust4) & POMC.combined.sct_V2_UMAP$UMAP_2 < -3 & POMC.combined.sct_V2_UMAP$UMAP_1 < 15 & POMC.combined.sct_V2_UMAP$UMAP_2 > -16)
+Clust4_Add = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest) & POMC.combined.sct_V2_UMAP$UMAP_2 > -15 & POMC.combined.sct_V2_UMAP$UMAP_2 < -8 & POMC.combined.sct_V2_UMAP$UMAP_1 < 16 & POMC.combined.sct_V2_UMAP$UMAP_1 > 5)
+Clust4_Clean =   subset(POMC.combined.Rest, cells = unique(c(row.names(Clust4_Keep), row.names(Clust4_Add))))
+
+
+
+POMC.combined.Rest2 = subset(POMC.combined.sct_V2, cells = c(colnames(Clust1_Clean), colnames(Clust2_Clean), colnames(Clust3_Clean), colnames(Clust4_Clean)), invert=T)
+
+set.kparam = c(20, 50)
+#ClusterFunc_All_RNA(POMC.combined.Rest2)
+
+DefaultAssay(POMC.combined.Rest2) = "integrated"
+POMC.combined.Rest2 <- FindNeighbors(POMC.combined.Rest2, k.param=50, dims=1:10)
+POMC.combined.Rest2 <- FindClusters(POMC.combined.Rest2, resolution = 1)
+DefaultAssay(POMC.combined.Rest2) = "RNA"
+
+Clust5 = subset(POMC.combined.Rest2, idents = c(1,11))
+Clust5_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust5) & POMC.combined.sct_V2_UMAP$UMAP_2 > -8)
+Clust5_Add = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest2) & POMC.combined.sct_V2_UMAP$UMAP_2 > -3 & POMC.combined.sct_V2_UMAP$UMAP_1 < -10 )
+Clust5_Clean =   subset(POMC.combined.Rest2, cells = unique(c(row.names(Clust5_Keep), row.names(Clust5_Add))))
+
+
+Clust6 = subset(POMC.combined.Rest2, idents = c(2,3,5,10))
+Clust6_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust6) & POMC.combined.sct_V2_UMAP$UMAP_2 < 5 & POMC.combined.sct_V2_UMAP$UMAP_1 > 8 )
+Clust6_Add = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest2) & POMC.combined.sct_V2_UMAP$UMAP_2 < 5 & POMC.combined.sct_V2_UMAP$UMAP_1 > 8)
+Clust6_Clean =   subset(POMC.combined.Rest2, cells = unique(c(row.names(Clust6_Keep), row.names(Clust6_Add))))
+
+
+
+POMC.combined.Rest3 = subset(POMC.combined.sct_V2, cells = c(colnames(Clust1_Clean), colnames(Clust2_Clean), colnames(Clust3_Clean), colnames(Clust4_Clean), colnames(Clust5_Clean), colnames(Clust6_Clean)), invert=T)
+
+set.kparam = c(20, 50)
+#ClusterFunc_All_RNA(POMC.combined.Rest3)
+
+DefaultAssay(POMC.combined.Rest3) = "integrated"
+POMC.combined.Rest3 <- FindNeighbors(POMC.combined.Rest3, k.param=20, dims=1:10)
+POMC.combined.Rest3 <- FindClusters(POMC.combined.Rest3, resolution = 1)
+DefaultAssay(POMC.combined.Rest3) = "RNA"
+
+Clust7 = subset(POMC.combined.Rest3, idents = c(6))
+#Clust7_Keep = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(Clust7) & POMC.combined.sct_V2_UMAP$UMAP_2 > -8)
+Clust7_Add = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest3) & POMC.combined.sct_V2_UMAP$UMAP_2 > 3 & POMC.combined.sct_V2_UMAP$UMAP_2 < 12 & POMC.combined.sct_V2_UMAP$UMAP_1 > 10 & POMC.combined.sct_V2_UMAP$UMAP_1 < 20 )
+Clust7_Clean =   subset(POMC.combined.Rest3, cells = unique(c(colnames(Clust7), row.names(Clust7_Add))))
+
+
+Clust8 = subset(POMC.combined.Rest3, idents = c(3,4,7,12))
+Clust8_Add = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest3) & POMC.combined.sct_V2_UMAP$UMAP_2 > -15 & POMC.combined.sct_V2_UMAP$UMAP_1 < -12)
+Clust8_Clean =   subset(POMC.combined.Rest3, cells = unique(c(colnames(Clust8), row.names(Clust8_Add))))
+
+POMC.combined.Rest4 = subset(POMC.combined.sct_V2, cells = c(colnames(Clust1_Clean), colnames(Clust2_Clean), colnames(Clust3_Clean), colnames(Clust4_Clean), colnames(Clust5_Clean), colnames(Clust6_Clean), colnames(Clust7_Clean), colnames(Clust8_Clean)), invert=T)
+
+Clust9 = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest4) & POMC.combined.sct_V2_UMAP$UMAP_1 < 0)
+Clust10 = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest4) & POMC.combined.sct_V2_UMAP$UMAP_1 0.5 & POMC.combined.sct_V2_UMAP$UMAP_2 > 0)
+Clust4Extra = subset(POMC.combined.sct_V2_UMAP, row.names(POMC.combined.sct_V2_UMAP) %in% colnames(POMC.combined.Rest4) & POMC.combined.sct_V2_UMAP$UMAP_1 0.5 & POMC.combined.sct_V2_UMAP$UMAP_2 < 0)
+
+
+
+
+POMCClusters = GenerateMetaData(list("POMC_1" = Clust1_Clean, "POMC_2" = Clust6_Clean,  "POMC_3" = Clust8_Clean,  "POMC_4" =Clust9, "POMC_4" = Clust4Extra, "POMC_5" = Clust5_Clean, "POMC_6" = Clust10, "POMC_7" = Clust3_Clean, "POMC_8" =Clust2_Clean, "POMC_9" =Clust4_Clean, "POMC_10" = Clust7_Clean))
+write.csv(POMCClusters, "POMCClusters_20FEB.csv")
+POMCClusters = read.csv("POMCClusters_17FEB.csv", row.names=1)
+POMCClusters$Pop = gsub("POMC4", "POMC_4", gsub("POMC8", "POMC_8", POMCClusters$Pop ))
+
+POMCClusters$Pop = factor(POMCClusters$Pop, levels = c("POMC_1", "POMC_2",  "POMC_3", "POMC_4", "POMC_5", "POMC_6", "POMC_7", "POMC_8", "POMC_9", "POMC_10"))
+POMC.combined.sct_V2 = AddMetaData(POMC.combined.sct_V2, POMCClusters, "POMCClusters")
+Idents(POMC.combined.sct_V2) = "POMCClusters"
+
+Fig3_POMCUMAP = DimPlot(POMC.combined.sct_V2, cols = POMC_ClustCols, label=T) +theme(axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666"), axis.text = element_text(color = "#666666"),  axis.title = element_text(color = "#666666")) + NoLegend()
+
+pdf("Fig3_POMC_UMAP.pdf", width = 7, height =7)
+print(Fig3_POMCUMAP)
+dev.off()
+
+
+DefaultAssay(POMC.combined.sct_V2) = "RNA"
+Fig3_FP_POMC = FeaturePlot(POMC.combined.sct_V2, c("POMC","TBX3", "NKX2-1", "LEPR","BDNF", "OTP","PCSK1", "PRDM12"), ncol =8)
+for(x in seq(1,8,1)){
+Fig3_FP_POMC[[x]] = Fig3_FP_POMC[[x]] +theme(axis.line = element_blank(),  axis.ticks = element_blank(), axis.text = element_blank(),  axis.title = element_blank(), plot.title = element_text(size = 12, face = "italic", hjust=0))+ NoLegend()+scale_color_gradientn(colours = c("lightgrey", GreenDark))
+}
+
+pdf("Fig3_NeuronType_FP.pdf", width = 15, height =2)
+print(Fig3_FP_POMC)
+dev.off()
+
+##
+
+POMC.combined.Meta = POMC.combined.sct_V2@meta.data
+
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "POMCClusters")
+for(x in unique(POMC.combined.Meta$POMCClusters)){
+Subs= subset(POMC.combined.Meta, POMC.combined.Meta$POMCClusters == x) 
+MetaTable = as.data.frame(table(Subs$StudyAll))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$POMCClusters = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents$Var1 = factor(CompilePercents$Var1, levels = c("Kim [Mouse Development]", "Romanov [Mouse Development]", "Moffit [Mouse Adult PO]", "Mickelsen [Mouse Adult LH]", "Wen [Mouse Adult SCN]", "Morris [Mouse Adult SCN]", "Liu [Mouse Adult VMH]", "Kim [Mouse Adult VMH]", "Affinati [Mouse Adult VMH]", "Campbell [Mouse Adult ARC]", "Flynn [Mouse Adult VPH]", "Chen [Mouse Adult]", "Zhao [Human Fetal]", "Herb [Human Fetal]", "Siletti [Human Adult]", "Yu [Mouse Adult POMC+]"))
+CompilePercents$POMCClusters = factor(CompilePercents$POMCClusters, levels = c("POMC_1", "POMC_2",  "POMC_3",  "POMC_4", "POMC_5", "POMC_6", "POMC_7", "POMC_8", "POMC_9", "POMC_10"))
+  
+StackedPlot = ggplot(CompilePercents, aes(fill=Var1, y=Percent, x=POMCClusters)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text.x = element_text(size = 12, angle = 90, hjust = 0.5, vjust =0, color = "#666666"), axis.title.y = element_text(size = 12, color = "#666666"), legend.title = element_blank(), axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666")) + scale_fill_manual(values = c(Fig3_Colors_Study,"Yu [Mouse Adult POMC+]" = DarkRed))
+
+
+
+pdf(paste("Fetal_ForPaper_Fig3POMC_StackedbyPercent.pdf", sep=""), width = 4.7, height = 4.7)
+print(StackedPlot)
+dev.off()
+
+
+pdf("Fig3_POMC_UMAP_Study.pdf", width = 7, height =5)
+print(DimPlot(POMC.combined.sct_V2, group.by = "StudyAll"))
+dev.off()
+
+
+
+###################
+
+
+
+
+POMCClusters_Strong = POMCClusters
+POMCClusters_Strong$Pop = ifelse(POMCClusters_Strong$Pop %in% c("POMC_3","POMC_5","POMC_7", "POMC_9", "POMC_10"), NA, "POMCHigh")
+
+POMC.combined.sct_V2 = AddMetaData(POMC.combined.sct_V2, POMCClusters_Strong, "POMC_StrongExp")
+Idents(POMC.combined.sct_V2) = "POMC_StrongExp"
+POMC.combined.sct_V3 = subset(POMC.combined.sct_V2, idents = "POMCHigh")
+
+DPlist2 = list()
+DPlist = list()
+FPlist = list()
+Filename = ""
+for(y in seq(10,30,10)){
+DefaultAssay(POMC.combined.sct_V3) = "integrated"
+POMC.combined.sct_V3 = RunPCA(POMC.combined.sct_V3, npcs = y)
+for(z in seq(10,y,10)){
+for(s in c(2,5,10)){
+DefaultAssay(POMC.combined.sct_V3) = "integrated"
+POMC.combined.sct_V3 <- RunUMAP(POMC.combined.sct_V3,dims = 1:z, spread= s)
+DefaultAssay(POMC.combined.sct_V3) = "SCT"
+
+FPlist[[paste("PCA", y, "_dims", z, "_spread", s)]] = FeaturePlot(POMC.combined.sct_V3, c("NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "PRDM12", "HDC", "GLIPR1", "ANXA2", "TTR", "PRLR"), reduction="umap") 
+
+DPlist[[paste("PCA", y, "_dims", z, "_spread", s)]] = DimPlot(POMC.combined.sct_V3, reduction="umap", split.by = "StudyAll") + labs(title = paste("PCA", y, "_dims", z, "_spread", s))
+
+DPlist2[[paste("PCA", y, "_dims", z, "_spread", s)]] = DimPlot(POMC.combined.sct_V3, reduction="umap", group.by = "StudyAll", label=T) + labs(title = paste("PCA", y, "dims", z, "spread", s))
+}}}  
+pdf(paste("POMC.combined.sct_V3", Filename, "_FeaturePlots.pdf", sep=""), width=26, height=20)
+print(FPlist)
+dev.off()
+
+pdf(paste("POMC.combined.sct_V3", Filename, "_SPLITUMAP.pdf", sep=""), width=50, height=5)
+print(DPlist)
+dev.off()
+
+pdf(paste("POMC.combined.sct_V3", Filename, "_GROUPUMAP.pdf", sep=""), width=8, height=5)
+print(DPlist2)
+dev.off()
+
+
+
+DefaultAssay(POMC.combined.sct_V3) = "RNA"
+POMC.combined.sct_V3 = NormalizeData(POMC.combined.sct_V3)
+
+DefaultAssay(POMC.combined.sct_V3) = "integrated"
+POMC.combined.sct_V3 = RunPCA(POMC.combined.sct_V3, npcs = 20) 
+POMC.combined.sct_V3 <- RunUMAP(POMC.combined.sct_V3,dims = 1:20, spread= 2)
+DefaultAssay(POMC.combined.sct_V3) = "SCT"
+
+GeneLists =list()
+GeneLists[["ARC"]] = c("NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "PRDM12", "HDC", "GLIPR1", "ANXA2", "TTR", "PRLR")
+set.res =1
+set.dim =20
+set.kparam = c(50, 100)
+ClusterFunc_All_RNA(POMC.combined.sct_V3)
+POMC.combined.sct_V3_UMAP = as.data.frame(POMC.combined.sct_V3@reductions$umap@cell.embeddings)
+
+DefaultAssay(POMC.combined.sct_V3) = "integrated"
+POMC.combined.sct_V3 <- FindNeighbors(POMC.combined.sct_V3, k.param=50, dims=1:20)
+POMC.combined.sct_V3 <- FindClusters(POMC.combined.sct_V3, resolution = 1)
+DefaultAssay(POMC.combined.sct_V3) = "RNA"
+
+ClustV3_1 = subset(POMC.combined.sct_V3, idents = c(7,9))
+ClustV3_1_Keep = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(ClustV3_1) & POMC.combined.sct_V3_UMAP$UMAP_1 > -10)
+ClustV3_1_Add = subset(POMC.combined.sct_V3_UMAP, POMC.combined.sct_V3_UMAP$UMAP_2 > 1 &  POMC.combined.sct_V3_UMAP$UMAP_1 > -8 & POMC.combined.sct_V3_UMAP$UMAP_1 < 0)
+ClustV3_1_Clean =   subset(POMC.combined.sct_V3, cells = unique(c(row.names(ClustV3_1_Keep), row.names(ClustV3_1_Add))))
+
+ClustV3_2 = subset(POMC.combined.sct_V3, idents = c(3,4,6,10))
+ClustV3_2_Keep = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(ClustV3_2) & POMC.combined.sct_V3_UMAP$UMAP_2 < 1 & POMC.combined.sct_V3_UMAP$UMAP_1 > 0)
+ClustV3_2_Add = subset(POMC.combined.sct_V3_UMAP, POMC.combined.sct_V3_UMAP$UMAP_2 < 0 &  POMC.combined.sct_V3_UMAP$UMAP_1 > 0)
+ClustV3_2_Clean =   subset(POMC.combined.sct_V3, cells = unique(c(row.names(ClustV3_2_Keep), row.names(ClustV3_2_Add))))
+
+
+POMC.combinedV3.Rest = subset(POMC.combined.sct_V3, cells = c(colnames(ClustV3_1_Clean), colnames(ClustV3_2_Clean)), invert=T)
+
+set.kparam = c(20)
+
+ClusterFunc_All_RNA(POMC.combinedV3.Rest)
+
+
+
+DefaultAssay(POMC.combinedV3.Rest) = "integrated"
+POMC.combinedV3.Rest <- FindNeighbors(POMC.combinedV3.Rest, k.param=20, dims=1:20)
+POMC.combinedV3.Rest <- FindClusters(POMC.combinedV3.Rest, resolution = 1)
+DefaultAssay(POMC.combinedV3.Rest) = "RNA"
+
+ClustV3_3 = subset(POMC.combinedV3.Rest, idents = 9)
+ClustV3_3_Add = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(POMC.combinedV3.Rest) & POMC.combined.sct_V3_UMAP$UMAP_2 > 6 & POMC.combined.sct_V3_UMAP$UMAP_2 < 10 & POMC.combined.sct_V3_UMAP$UMAP_1 < 13 & POMC.combined.sct_V3_UMAP$UMAP_1 > 7 | row.names(POMC.combined.sct_V3_UMAP) %in% colnames(POMC.combinedV3.Rest) & POMC.combined.sct_V3_UMAP$UMAP_2 > 4 & POMC.combined.sct_V3_UMAP$UMAP_2 < 6 & POMC.combined.sct_V3_UMAP$UMAP_1 < 13 & POMC.combined.sct_V3_UMAP$UMAP_1 > 10)
+ClustV3_3_Clean =   subset(POMC.combinedV3.Rest, cells = unique(c(colnames(ClustV3_3), row.names(ClustV3_3_Add))))
+
+ClustV3_4 = subset(POMC.combinedV3.Rest, idents = c(5,11))
+ClustV3_4_Keep = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(ClustV3_4) & ! row.names(POMC.combined.sct_V3_UMAP) %in% colnames(ClustV3_3_Clean) & POMC.combined.sct_V3_UMAP$UMAP_1 < 10)
+
+ClustV3_4_Add = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(POMC.combinedV3.Rest) &  POMC.combined.sct_V3_UMAP$UMAP_1 < 8 & POMC.combined.sct_V3_UMAP$UMAP_1 > 5 & POMC.combined.sct_V3_UMAP$UMAP_2 < 7)
+ClustV3_4_Clean =   subset(POMC.combinedV3.Rest, cells = unique(c(row.names(ClustV3_4_Keep), row.names(ClustV3_4_Add))))
+
+POMC.combinedV3.RestV2 = subset(POMC.combined.sct_V3, cells = c(colnames(ClustV3_1_Clean), colnames(ClustV3_2_Clean), colnames(ClustV3_3_Clean), colnames(ClustV3_4_Clean)), invert=T)
+
+ClustV3_5 = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(POMC.combinedV3.RestV2) & POMC.combined.sct_V3_UMAP$UMAP_1 < 0)
+ClustV3_6 = subset(POMC.combined.sct_V3_UMAP, row.names(POMC.combined.sct_V3_UMAP) %in% colnames(POMC.combinedV3.RestV2) & POMC.combined.sct_V3_UMAP$UMAP_1 > 0)
+
+
+CheckInput = ClustV3_5
+CheckUMAP(POMC.combined.sct_V3)
+
+
+POMCClusters_V3 = GenerateMetaData(list("POMC_1" = ClustV3_5, "POMC_2" = ClustV3_2_Clean,  "POMC_3" = ClustV3_1_Clean,  "POMC_4" = ClustV3_6, "POMC_5" = ClustV3_3_Clean, "POMC_6" = ClustV3_4_Clean))
+write.csv(POMCClusters_V3, "POMCClusters_21FEB.csv")
+#POMCClusters = read.csv("POMCClusters_17FEB.csv", row.names=1)
+
+POMCClusters_V3$Pop = factor(POMCClusters_V3$Pop, levels = c("POMC_1", "POMC_2",  "POMC_3", "POMC_4", "POMC_5", "POMC_6"))
+POMC.combined.sct_V3 = AddMetaData(POMC.combined.sct_V3, POMCClusters_V3, "POMCClusters_V3")
+Idents(POMC.combined.sct_V3) = "POMCClusters_V3"
+
+
+##FIG 3F
+Fig3_POMCUMAP = DimPlot(POMC.combined.sct_V3, cols = POMC_ClustCols_V3, label=T) +theme(axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666"), axis.text = element_text(color = "#666666"),  axis.title = element_text(color = "#666666")) + NoLegend()
+
+pdf("Fig3_POMC_UMAP_V3.pdf", width = 7, height =7)
+print(Fig3_POMCUMAP)
+dev.off()
+
+
+DefaultAssay(POMC.combined.sct_V3) = "RNA"
+Fig3_FP_POMC = FeaturePlot(POMC.combined.sct_V3, c("POMC","TBX3","SIX3", "SIX6", "PRDM12", "HMGN3"), ncol =6)
+for(x in seq(1,6,1)){
+Fig3_FP_POMC[[x]] = Fig3_FP_POMC[[x]] +theme(axis.line = element_line(color = "lightgrey"),  axis.ticks = element_blank(), axis.text = element_blank(),  axis.title = element_blank(), plot.title = element_text(size = 12, face = "italic", hjust=0))+NoLegend() +scale_color_gradientn(colours = c("lightgrey", GreenDark))
+}
+
+pdf("Fig3_NeuronType_FP_V3.pdf", width = 17, height =3)
+print(Fig3_FP_POMC)
+dev.off()
+#"PIN1","NHLH2",  "SIX6", "FOS", "NR2F2", "SOX2", "ZBTB20", "JUNB", "MEIS2", "DRAP1", "YBX1", "THRA", "DBP", "ZNF428", "RORB", "PURA", "STAT3", "NR2F1", "SOX3", "POU2F2"
+##
+
+DefaultAssay(POMC.combined.sct_V3) = "RNA"
+Fig3_FP_POMC = FeaturePlot(POMC.combined.sct_V3, c("POMC")) +theme(axis.line = element_blank(),  axis.ticks = element_blank(), axis.text = element_blank(),  axis.title = element_blank(), plot.title = element_text(size = 12, face = "italic", hjust=0))+scale_color_gradientn(colours = c("lightgrey", GreenDark))
+
+
+##FIG 3G
+POMC.combined.Meta = POMC.combined.sct_V3@meta.data
+
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "POMCClusters")
+for(x in unique(POMC.combined.Meta$POMCClusters_V3)){
+Subs= subset(POMC.combined.Meta, POMC.combined.Meta$POMCClusters_V3 == x) 
+MetaTable = as.data.frame(table(Subs$StudyAll))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$POMCClusters_V3 = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents$Var1 = factor(CompilePercents$Var1, levels = c("Kim [Mouse Development]", "Romanov [Mouse Development]", "Moffit [Mouse Adult PO]", "Mickelsen [Mouse Adult LH]", "Wen [Mouse Adult SCN]", "Morris [Mouse Adult SCN]", "Liu [Mouse Adult VMH]", "Kim [Mouse Adult VMH]", "Affinati [Mouse Adult VMH]", "Campbell [Mouse Adult ARC]", "Flynn [Mouse Adult VPH]", "Chen [Mouse Adult]", "Zhao [Human Fetal]", "Herb [Human Fetal]", "Siletti [Human Adult]", "Yu [Mouse Adult POMC+]"))
+CompilePercents$POMCClusters_V3 = factor(CompilePercents$POMCClusters_V3, levels = c("POMC_1", "POMC_2",  "POMC_3",  "POMC_4", "POMC_5", "POMC_6"))
+  
+StackedPlot = ggplot(CompilePercents, aes(fill=Var1, y=Percent, x=POMCClusters_V3)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text.x = element_text(size = 12, angle = 90, hjust = 0.5, vjust =0, color = "#666666"), axis.title.y = element_text(size = 12, color = "#666666"), legend.title = element_blank(), axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666")) + scale_fill_manual(values = c(Fig3_Colors_Study,"Yu [Mouse Adult POMC+]" = DarkRed))
+
+
+
+pdf(paste("Fetal_ForPaper_Fig3POMC_StackedbyPercent_V3.pdf", sep=""), width = 4.7, height = 4.7)
+print(StackedPlot)
+dev.off()
+
+
+pdf("Fig3_POMC_UMAP_Study_V3.pdf", width = 7, height =7)
+print(DimPlot(POMC.combined.sct_V3, group.by = "StudyAll", cols = c(Fig3_Colors_Study,"Yu [Mouse Adult POMC+]" = DarkRed))+theme(axis.line = element_line(color = "#666666"), axis.ticks = element_line(color = "#666666"), axis.text = element_text(color = "#666666"),  axis.title = element_text(color = "#666666"), plot.title = element_blank()) + NoLegend())
+dev.off()
+
+
+POMC.combined.sct_V3@meta.data$StudyBroad = ifelse(POMC.combined.sct_V3@meta.data$StudyAll %in% grep("Mouse Adult", POMC.combined.sct_V3@meta.data$StudyAll, value = T), "Mouse Adult", "")
+POMC.combined.sct_V3@meta.data$StudyBroad = ifelse(POMC.combined.sct_V3@meta.data$StudyAll %in% grep("Human Adult", POMC.combined.sct_V3@meta.data$StudyAll, value = T), "Human Adult", POMC.combined.sct_V3@meta.data$StudyBroad)
+POMC.combined.sct_V3@meta.data$StudyBroad = ifelse(POMC.combined.sct_V3@meta.data$StudyAll %in% grep("Mouse Development", POMC.combined.sct_V3@meta.data$StudyAll, value = T), "Mouse Development", POMC.combined.sct_V3@meta.data$StudyBroad)
+POMC.combined.sct_V3@meta.data$StudyBroad = ifelse(POMC.combined.sct_V3@meta.data$StudyAll %in% grep("Human Fetal", POMC.combined.sct_V3@meta.data$StudyAll, value = T), "Human Fetal", POMC.combined.sct_V3@meta.data$StudyBroad)
+POMC.combined.sct_V3@meta.data$count = 1
+
+SupTableFig3_ClustersPOMC = POMC.combined.sct_V3@meta.data %>% group_by(POMCClusters_V3, StudyBroad) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableFig3_ClustersPOMC, "SupTableFig3_ClustersPOMC.csv", row.names=F)
+```
+
+#FIG3-TF-COEXPRESSION
+```{r}
+MusRefEdKaZhou@meta.data$StudyBroad = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("Mouse Adult", MusRefEdKaZhou@meta.data$StudyAll, value = T), "Mouse Adult", "")
+MusRefEdKaZhou@meta.data$StudyBroad = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("Human Adult", MusRefEdKaZhou@meta.data$StudyAll, value = T), "Human Adult", MusRefEdKaZhou@meta.data$StudyBroad)
+MusRefEdKaZhou@meta.data$StudyBroad = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("Mouse Development", MusRefEdKaZhou@meta.data$StudyAll, value = T), "Mouse Development", MusRefEdKaZhou@meta.data$StudyBroad)
+MusRefEdKaZhou@meta.data$StudyBroad = ifelse(MusRefEdKaZhou@meta.data$StudyAll %in% grep("Human Fetal", MusRefEdKaZhou@meta.data$StudyAll, value = T), "Human Fetal", MusRefEdKaZhou@meta.data$StudyBroad)
+
+POMC.combined.sct_V2 = readRDS("POMC.combined.sct_V2.rds")
+
+POMCClusters = read.csv("POMCClusters_21FEB.csv", row.names=1)
+row.names(POMCClusters) = gsub("Orig_", "", row.names(POMCClusters))
+POMC.combined.sct_V3 = subset(POMC.combined.sct_V2, cells = row.names(POMCClusters))
+Idents(POMC.combined.sct_V3) = "StudyAll"
+Yu_Only = subset(POMC.combined.sct_V3, idents = "Yu [Mouse Adult POMC+]")
+DefaultAssay(POMC.combined.sct_V3) = "integrated"
+POMC.combined.sct_V3 = RunPCA(POMC.combined.sct_V3, npcs = 20) 
+POMC.combined.sct_V3 <- RunUMAP(POMC.combined.sct_V3,dims = 1:20, spread= 2)
+DefaultAssay(POMC.combined.sct_V3) = "SCT"
+
+Seu_ForTFComp <- merge(MusRefEdKaZhou, y = Yu_Only, add.cell.ids = c("All", "Yu"), project = "Hypo")
+
+Seu_ForTFComp@meta.data$OG_Barcs = gsub("All_", "", gsub("Yu_", "", gsub("Orig_", "", row.names(Seu_ForTFComp@meta.data))))
+
+Seu_ForTFComp@meta.data$SamplesBroad_POMC = ifelse(Seu_ForTFComp@meta.data$OG_Barcs %in% row.names(POMCClusters), paste(Seu_ForTFComp@meta.data$SamplesBroad, "[POMC+]"), paste(Seu_ForTFComp@meta.data$SamplesBroad, "[POMC-]"))
+Seu_ForTFComp@meta.data$SamplesBroad_POMC = gsub("Mouse Fetal", "Mouse Development", gsub("Postnatal", "Development", gsub("NA", "Mouse Development",  Seu_ForTFComp@meta.data$SamplesBroad_POMC)))
+Seu_ForTFComp@meta.data$SamplesBroad_POMC = factor(Seu_ForTFComp@meta.data$SamplesBroad_POMC, levels = rev(c("Human Adult [POMC+]", "Human Adult [POMC-]", "Human Fetal [POMC+]", "Human Fetal [POMC-]", "Mouse Adult [POMC+]",   "Mouse Adult [POMC-]", "Mouse Development [POMC+]", "Mouse Development [POMC-]")))
+
+
+Seu_ForTFComp@meta.data$Is_POMC_Human = ifelse(Seu_ForTFComp@meta.data$SamplesBroad_POMC %in% c("Human Fetal [POMC+]", "Human Adult [POMC+]"), "Human [POMC+]", "POMC-")
+Seu_ForTFComp@meta.data$Is_POMC_Mouse = ifelse(Seu_ForTFComp@meta.data$SamplesBroad_POMC %in% c("Mouse Development [POMC+]", "Mouse Adult [POMC+]"), "Mouse [POMC+]", "POMC-")
+
+DefaultAssay(Seu_ForTFComp) ="RNA"
+Idents(Seu_ForTFComp) = "Is_POMC_Human"
+Markers_Human = FindMarkers(Seu_ForTFComp, ident.1 = "Human [POMC+]", logfc.threshold = 0.0, features = AllTFs, only.pos = T)
+Idents(Seu_ForTFComp) = "Is_POMC_Mouse"
+Markers_Mouse = FindMarkers(Seu_ForTFComp, ident.1 = "Mouse [POMC+]", logfc.threshold = 0.0, features = AllTFs, only.pos = T)  
+Markers_Human$Delta = Markers_Human$pct.1/ Markers_Human$pct.2
+Markers_Mouse$Delta = Markers_Mouse$pct.1/ Markers_Mouse$pct.2
+
+Markers_Human_subs = subset(Markers_Human, Markers_Human$avg_log2FC > 0.3 & Markers_Human$Delta > 2 & Markers_Human$pct.1 > 0.2 & Markers_Human$p_val_adj < 0.05)
+Markers_Mouse_subs = subset(Markers_Mouse, Markers_Mouse$avg_log2FC > 0.3 & Markers_Mouse$Delta > 2 & Markers_Mouse$pct.1 > 0.2 & Markers_Mouse$p_val_adj < 0.05)
+
+Markers_All_subs2 = subset(Markers_Human_subs, row.names(Markers_Human_subs) %in% row.names(Markers_Mouse_subs) )
+Markers_All_subs2$Analysis = "All"
+
+Markers_Human_subs2 = subset(Markers_Human_subs, ! row.names(Markers_Human_subs) %in% c(row.names(Markers_Mouse_subs)))
+Markers_Human_subs2$Analysis = "Human"
+
+Markers_Mouse_subs2 = subset(Markers_Mouse_subs, ! row.names(Markers_Mouse_subs) %in% c(row.names(Markers_Human_subs)))
+Markers_Mouse_subs2$Analysis = "Mouse"
+
+AllCandDEGs = rbind(Markers_Human_subs2, Markers_Mouse_subs2, Markers_All_subs2) 
+AllCandDEGs$Analysis = factor(AllCandDEGs$Analysis, c("All", "Human",  "Mouse"))
+AllCandDEGs = AllCandDEGs[order(AllCandDEGs$Analysis, -AllCandDEGs$avg_log2FC), ]
+
+##FIGURE 3H
+Idents(Seu_ForTFComp) ='SamplesBroad_POMC'
+DefaultAssay(Seu_ForTFComp) = "RNA"
+DotP = DotPlot(Seu_ForTFComp,assay = "RNA", features = row.names(AllCandDEGs),  cols = c("#D3D3D3", HeatmapBlue), dot.min = 0.05, dot.scale= 10) + theme(axis.text.x = element_text(size=10, face="italic", angle = 90, vjust = 0.5, hjust=1), axis.text.y = element_text(size=10), legend.title = element_text(size=8)) + ylab("") +xlab("")
+
+
+pdf("Fig3_TF_DEG_DotPlot_V3.pdf", width = 10, height =7)
+print(DotP)
+dev.off()
+
+##FIGURE 3I
+DefaultAssay(POMC.combined.sct_V3) = "RNA"
+Fig3_FP_POMC = FeaturePlot(POMC.combined.sct_V3, c("POMC", row.names(AllCandDEGs)), ncol =ceiling(length(c("POMC",row.names(AllCandDEGs)))/2))
+for(x in seq(1,length(c("POMC", row.names(AllCandDEGs))),1)){
+Fig3_FP_POMC[[x]] = Fig3_FP_POMC[[x]] +theme(axis.line = element_line(color = "lightgrey"),  axis.ticks = element_blank(), axis.text = element_blank(),  axis.title = element_blank(), plot.title = element_text(size = 12, face = "italic", hjust=0))+NoLegend() +scale_color_gradientn(colours = c("lightgrey", GreenDark))
+}
+
+pdf("Fig3_NeuronType_FP_V3.pdf", width = 18, height =4)
+print(Fig3_FP_POMC)
+dev.off()
+```
+
+
