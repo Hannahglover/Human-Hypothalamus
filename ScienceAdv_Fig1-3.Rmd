@@ -709,7 +709,7 @@ write.csv(SupTable4, "SciAdv_SupTable4.csv", row.names = F)
 
 #FIG2-GENERATE-TRAJECTORIES
 ```{r F2:TRAJECT}
-EdKaZhouHypoNeurons = readRDS("~/Downloads/EdKaZhouHypoNeurons_mt10_integrated.rds")
+EdKaZhouHypoNeurons = readRDS("~/Downloads/Sci Adv/EdKaZhouHypoNeurons_mt10_integrated.rds")
 set.seed(100)
 EdKaZhouHypoNeurons@meta.data$SampleBroad = gsub("_.*", "", gsub("22T", "22", gsub("CS22", "GW10", EdKaZhouHypoNeurons@meta.data$sample)))
 EdKaZhouHypoNeurons@meta.data$SampleBroad = ifelse(EdKaZhouHypoNeurons@meta.data$SampleBroad %in% c("10X190", "10X192", "10X193", "10X203", "10X360", "10X362", "10X376", "10X380", "10X389", "10X392"), EdKaZhouHypoNeurons@meta.data$Roi, EdKaZhouHypoNeurons@meta.data$SampleBroad)
@@ -941,6 +941,55 @@ save.image(paste(Filename, "_k", kval, ".RData", sep=""))
 #}
 #}
 ```
+
+#FIG-2-REVISION PLOTS
+```{r}
+for(LIN in c("6_k100", "3_k20",  "3_k100", "3_k150")){ 
+load(paste("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, ".RData", sep=""))
+EdKaZhouHypoNeurons$Stage = "Trimester1"
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%c('GW15','GW16','GW18','GW19','GW20','GW22','GW25'),'Stage'] = 'Trimester2'
+#EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%c('GW15','GW16','GW18','GW19','GW20','GW22','GW25'),'Stage'] = 'Trimester2'
+
+
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%"Adult",'Stage'] = 'Adult'
+perSamp = vector(mode='list',length=length(unique(EdKaZhouHypoNeurons$Vertex)))
+names(perSamp)=unique(EdKaZhouHypoNeurons$Vertex)
+ 
+for(i in names(perSamp)){
+tmp = table(EdKaZhouHypoNeurons$Stage[which(EdKaZhouHypoNeurons$Vertex==i)])
+tmp2=c(0,0,0)
+names(tmp2)=c("Trimester1","Trimester2","Adult")
+tmpov = intersect(names(tmp),names(tmp2))
+tmp2[tmpov] = tmp[tmpov]
+tmpPer = round((tmp2/length(which(EdKaZhouHypoNeurons$Vertex==i)))*100,0)
+perSamp[[i]] = tmpPer
+}
+ 
+V(net.NODE)$pie.color=list(c("#fecf29","#538d22","#ff7aa2"))
+perSamp2=perSamp[V(net.NODE)$name]
+ 
+pdf(file=paste('./MainLineage_WithLabs_', LIN, '.pdf', sep=""))
+plot(net.NODE,layout=lrt.NODE,
+ vertex.shape="pie",
+ vertex.size=3,
+ vertex.pie=perSamp2,
+ vertex.label.dist=0.8,
+ vertex.label.cex=0.6,
+ vertex.label.degree=pi)#, edge.width=1:10)
+dev.off()
+ 
+pdf(file=paste('./MainLineage_NoLabs_', LIN, '.pdf', sep=""))
+plot(net.NODE,layout=lrt.NODE,
+ vertex.shape="pie",
+ vertex.size=3,
+ vertex.pie=perSamp2,
+ vertex.label=NA, edge.width=1:10)
+dev.off()
+  
+}
+```
+
+
 
 #FIG2-ADDITIONAL-PLOTS
 ```{r}
@@ -1858,7 +1907,7 @@ dev.off()
 #FIG3-ALL-CELLS
 ```{r}
 ##REORGANIZE METADATA
-MusRefEdKaZhou = readRDS("~/Downloads/MusRefEdKaZhouHypoNeurons_mt10_integrated.rds")
+MusRefEdKaZhou = readRDS("~/Downloads/Sci Adv/MusRefEdKaZhouHypoNeurons_mt10_integrated.rds")
 MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$sample %in% grep("^10X", MusRefEdKaZhou@meta.data$sample, value = T), MusRefEdKaZhou@meta.data$Roi,  MusRefEdKaZhou@meta.data$sample)
 MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Aff", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [VMH]",  MusRefEdKaZhou@meta.data$NewSampleID)
 MusRefEdKaZhou@meta.data$NewSampleID = ifelse(MusRefEdKaZhou@meta.data$NewSampleID %in% grep("^Flynn", MusRefEdKaZhou@meta.data$sample, value = T), "Mouse Adult [VPH]",  MusRefEdKaZhou@meta.data$NewSampleID)  
