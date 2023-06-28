@@ -42,5 +42,5 @@ Hypo.combined <- IntegrateData(anchorset = Hypo.anchors)
 
 Hypo.combined = ScaleData(Hypo.combined, vars.to.regress = "percent.mt")
 Hypo.combined = RunPCA(Hypo.combined)
-Hypo.combined = RunUMAP(Hypo.combined dims = 1:30)
+Hypo.combined = RunUMAP(Hypo.combined, dims = 1:30)
 saveRDS(Hypo.combined, "~/HypoMapHUMAN.rds")
