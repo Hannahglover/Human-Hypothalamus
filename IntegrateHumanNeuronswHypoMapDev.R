@@ -9,7 +9,6 @@ EdKaZhou@meta.data$Dataset = ifelse(EdKaZhou@meta.data$sample %in% c("CS22_2_hyp
 DefaultAssay(EdKaZhou) = "RNA"
 EdKaZhouNeurons = SplitObject(EdKaZhou, split.by = "Dataset")
 
-
 #HYPOMAP DATA
 hypoMap = readRDS("~/hypoMap.rds")
 hypoMap = ConvertGeneNames(hypoMap, reference.names = row.names(Neuro.combined), homolog.table = "https://seurat.nygenome.org/azimuth/references/homologs.rds")
@@ -44,17 +43,15 @@ Romanov_Data@meta.data$Dataset = "RomanovDev"
 #saveRDS(Romanov_Data, "~/RomanovDevNeuronsHuman.rds")
 #RomanovDev = readRDS("RomanovDevNeuronsHuman.rds")
 
-
-#TRANSFER HYPOMAP DATA TO HUMAN
-Hypo.anchors <- FindTransferAnchors(reference = hypoMap, query = EdKaZhou,  dims = 1:30)
-predictions <- TransferData(anchorset = Hypo.anchors, refdata = list("Dataset" = hypoMap$Dataset, "C2_named" = hypoMap$C2_named, "C7_named" = hypoMap$C7_named, "C25_named" = hypoMap$C25_named, "C66_named" = hypoMap$C66_named, "C185_named" = hypoMap$C185_named, "C286_named" = hypoMap$C286_named, "C465_named" = hypoMap$C465_named, "Region_predicted" = hypoMap$Region_predicted, "Region_summarized" = hypoMap$Region_summarized),   dims = 1:30)
-EdKaZhou <- AddMetaData(EdKaZhou, metadata = predictions)
-saveRDS(predictions, "predictions_refined.rds")
-
-
 Hypo.list = c("Romanov" = RomanovDev, "Kim" = KimDev, EdKaZhouNeurons, hypoMapData)
+
+CommonGenes = intersect(row.names(RomanovDev@assays$RNA@data), row.names(KimDev@assays$RNA@data))
+CommonGenes = intersect(CommonGenes, row.names(EdKaZhouNeurons@assays$RNA@data))
+CommonGenes = intersect(CommonGenes, row.names(hypoMapData@assays$RNA@data))
+
 rm(hypoMap)
 rm(EdKaZhou)
+
 
 for(n in names(Hypo.list)){
   DefaultAssay(Hypo.list[[n]]) = "RNA"
@@ -79,5 +76,32 @@ Hypo.combined <- IntegrateData(anchorset = Hypo.anchors)
 
 Hypo.combined = ScaleData(Hypo.combined, vars.to.regress = "percent.mt")
 Hypo.combined = RunPCA(Hypo.combined)
-Hypo.combined = RunUMAP(Hypo.combined, dims = 1:30)
+Hypo.combined = RunHarmony(Hypo.combined, group.by.vars = "DatasetClean")
+Hypo.combined = RunUMAP(Hypo.combined, reduction = "harmony", dims = 1:30)
 saveRDS(Hypo.combined, "~/HypoMapHUMANDev.rds")
+
+
+
+### TRANSFER HYPOMAP ANNOTATIONS
+Hypo.combined@meta.data$Source = ifelse(Hypo.combined@meta.data$Dataset %in% c("Herb", "Siletti", "Zhou", "KimDev", "RomanovDev"), "NonHypoMap", "HypoMap")
+DefaultAssay(Hypo.combined) = "RNA"
+Hypo.Split = SplitObject(Hypo.combined, split.by = "Source")
+
+Hypo.anchors <- FindTransferAnchors(reference = Hypo.Split[["HypoMap"]], query = Hypo.Split[["NonHypoMap"]],  dims = 1:30, features = CommonGenes)
+predictions <- TransferData(anchorset = Hypo.anchors, refdata = list("Dataset" = Hypo.Split[["HypoMap"]]$Dataset, "C2_named" = Hypo.Split[["HypoMap"]]$C2_named, "C7_named" = Hypo.Split[["HypoMap"]]$C7_named, "C25_named" = Hypo.Split[["HypoMap"]]$C25_named, "C66_named" = Hypo.Split[["HypoMap"]]$C66_named, "C185_named" = Hypo.Split[["HypoMap"]]$C185_named, "C286_named" = Hypo.Split[["HypoMap"]]$C286_named, "C465_named" = Hypo.Split[["HypoMap"]]$C465_named, "Region_predicted" = Hypo.Split[["HypoMap"]]$Region_predicted, "Region_summarized" = Hypo.Split[["HypoMap"]]$Region_summarized),   dims = 1:30)
+saveRDS(predictions, "predictions_SplitObjRNA.rds")
+
+for(x in names(predictions)){
+  PullAnnots = predictions[[x]]
+  PullAnnotations = PullAnnots %>% dplyr::select(predicted.id)
+  Hypo.combined = AddMetaData(Hypo.combined, PullAnnotations, paste("HypoMapPredicted_", x, sep=""))
+  PullAnnotations = PullAnnots %>% dplyr::select(prediction.score.max)
+  Hypo.combined = AddMetaData(Hypo.combined, PullAnnotations, paste("HypoMapPredictionScore_", x, sep=""))
+}
+
+#Clean up dataset annotation
+Hypo.combined@meta.data$DatasetClean = gsub("Affinati10x", "Affinati [Mouse Adult VMH]", gsub("Anderson10x", "Liu  [Mouse Adult VMH]", gsub("CampbellDropseq", "Campbell [Mouse Adult ARC]", gsub("ChenDropseq", "Chen [Mouse Adult]", gsub("Dowsett10xnuc", "Dowsett [Mouse Adult Hindbrain]", gsub("Flynn10x", "Mickelsen [Mouse Adult VPH]", gsub("Herb", "Herb [Human Fetal]", gsub("Kim10x", "Kim [Mouse Adult VMH]", gsub("KimDev", "Kim [Mouse Development]", gsub("LeeDropseq", "Lee [Mouse Adult]", gsub("Mickelsen10x", "Mickelsen [Mouse Adult LH]", gsub("Moffit10x", "Moffit [Mouse Adult PO]", gsub("Morris10x", "Morris [Mouse Adult SCN]", gsub("Mousebrainorg10x", "Zeisel [Mouse Adult]", gsub("RomanovDev", "Romanov [Mouse Development]", gsub("RossiDropseq", "Rossi [Mouse Adult LH", gsub("Rupp10x", "Rupp [Mouse Adult Lepr+]", gsub("Siletti", "Siletti [Human Adult]", gsub("Wen10x", "Wen [Mouse Adult SCN]", gsub("wenDropseq", "Wen [Mouse Adult SCN]", gsub("Zhou", "Zhou [Human Fetal]", Hypo.combined@meta.data$Dataset)))))))))))))))))))))
+
+
+saveRDS(Hypo.combined, "~/HypoMapHUMANDev.rds")
+
