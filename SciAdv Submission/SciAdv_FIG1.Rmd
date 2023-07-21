@@ -1,0 +1,619 @@
+---
+title: "FIGURE 1 ANALYSIS"
+output: html_notebook
+---
+
+###############################################
+#################### SETUP ####################
+###############################################
+
+#Install Packages
+```{r}
+library(tidyverse)
+library(igraph)
+library(monocle3)
+library(Seurat)
+library(plotly)
+library(ggalluvial)
+library(ggpubr)
+```
+
+#Colors
+```{r}
+LightPink =   "#ffc2d4"
+MedPink =     "#ff9ebb"
+DarkPink =    "#ff7aa2"
+DarkRed =     "#9e1b44"
+LightRed =    "#d64050"
+DarkOrange =  "#f36c44" 
+LightOrange = "#faad60"
+Mustard =     "#fecf29"
+LightYellow = "#fee08b"
+GreenLighest ="#aad576"
+GreenMedLight="#78a02d"
+GreenMedDark ="#538d22"
+GreenDark =   "#245501"
+BlueDark =    "#133c55"
+BlueMedDark = "#386fa4"
+BlueMedLight ="#59a5d8"
+BlueLighest = "#84d2f6"
+LightPurple = "#b185db"
+DarkPurple =  "#7251b5"
+Grey =        "#666666"
+HeatmapBlue = BlueMedDark
+
+TimepointColors_Fetal = c("GW6" = BlueDark, "GW7" = DarkPurple, "GW8" = LightPurple, "GW10" = LightPink, "GW12" = DarkPink, "GW15" = DarkRed, "GW16" = DarkOrange, "GW18" = LightOrange, "GW19" = Mustard, "GW20" = GreenLighest, "GW22" = GreenMedDark, "GW25" = BlueMedDark, "GW20" = BlueLighest) #12
+
+TimepointColors_FetalZhou = c("GW6" = LightPink, "GW7" = MedPink, "GW7 [Zhou]" = DarkPink, "GW8 [Zhou]" = DarkRed, "GW10" = LightRed, "GW10 [Zhou]" = DarkOrange, "GW12 [Zhou]" = LightOrange, "GW15 [Zhou]" = Mustard, "GW16" = LightYellow, "GW18" = GreenLighest, "GW18 [Zhou]" = GreenMedDark, "GW19" = BlueDark, "GW20" = BlueMedDark, "GW20 [Zhou]"= BlueLighest, "GW22" = LightPurple, "GW25"= DarkPurple) #16
+
+CellPopColors = c("tRGC"= LightPink, "cRGC"= MedPink, "qRGC" = DarkPink, "IntProgen_1" = DarkRed, "IntProgen_2" = LightRed, "IntProgen_3" = "#c26e40",    "Neuronal"= DarkOrange, "Oligodendrocytes [Dividing]" = LightOrange, "Oligodendrocytes [Immature]" = Mustard, "Oligodendrocytes [Intermediate]"= LightYellow, "Oligodendrocytes [Mature]"= GreenLighest, "Astrocytes" = GreenMedLight, "Ependymal" = GreenMedDark, "Tanycytes" = GreenDark, "Microglia" = BlueDark, "Pericytes" = BlueMedDark, "vSMC" = BlueMedLight, "VLMC" = BlueLighest, "Endothelial"  = LightPurple, "Blood" = DarkPurple) #19
+```
+
+#Functions
+```{r}
+###### FUNCTION TO GENERATE BINARY 2D UMAP ###### 
+CheckUMAP = function(SeuFile, Dims = c(1,2), red = "umap"){
+  if(class(CheckInput) == "data.frame"){
+CheckMeta = as.data.frame(c(rep("RoI", length(row.names(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = row.names(CheckInput)
+  }else{
+    CheckMeta = as.data.frame(c(rep("RoI", length(colnames(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = colnames(CheckInput)
+  }
+
+SeuFile = AddMetaData(SeuFile, CheckMeta, "CheckMeta")
+Idents(SeuFile) = "CheckMeta"
+DimPlot(SeuFile, dims = Dims, reduction=red, raster = T)
+}
+
+###### FUNCTION TO GENERATE BINARY 3D UMAP ###### 
+CheckUMAP_3D = function(SeuFile){
+  if(class(CheckInput) == "data.frame"){
+CheckMeta = as.data.frame(c(rep("RoI", length(row.names(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = row.names(CheckInput)
+  }else{
+    CheckMeta = as.data.frame(c(rep("RoI", length(colnames(CheckInput)))))
+colnames(CheckMeta) = "Pop"
+row.names(CheckMeta) = colnames(CheckInput)
+  }
+
+PlotInput = merge(KaZhou_3D, CheckMeta, by = 0, all.x=T)
+PlotInput[is.na(PlotInput)] = "NA"
+return(PlotInput)
+}
+
+
+###### FUNCTION TO ASSEMBLE METADATA ###### 
+GenerateMetaData = function(ListMeta){
+MetaOutput = as.data.frame(matrix(ncol = 1, nrow =0))  
+for(x in seq(1,length(ListMeta),1)){
+if(class(ListMeta[[x]]) == "data.frame"){
+Temp = as.data.frame(rep(names(ListMeta)[[x]], length(row.names(ListMeta[[x]]))))  
+colnames(Temp) = "Pop"
+row.names(Temp) = row.names(ListMeta[[x]])
+}else{
+Temp = as.data.frame(rep(names(ListMeta)[[x]], length(colnames(ListMeta[[x]]))))  
+colnames(Temp) = "Pop"
+row.names(Temp) = colnames(ListMeta[[x]]) 
+}
+MetaOutput = rbind(MetaOutput, Temp)  
+}
+return(MetaOutput)
+}
+
+
+###### GENE LISTS FOR CLUSTERING FUCNTION ###### 
+GeneLists = list()
+GeneLists[["IntProg"]] = c("STMN2", "SYT1", "VIM1", "NEUROG2", "ASCL1", "EBF2", "NHLH1", "EBF3", "RND2", "RSPO3", "OTP", "SOX2", "LHX2", "VIM", "HES1", "NGN2", "SOX11", "DLL1", "DLL2", "DLX1", "DLX2")
+GeneLists[["BroadGenes"]] = c("SYT1", "SNAP25", "TUBB3","SYP", #Broad Neuronal 
+               "SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1", #GABAergic
+           "SLC17A6", "SLC17A8") #Glutaminergic
+GeneLists[["HypothalamicProgenSubclass"]] =c("VIM", "ASCL1", #Hypothalamic Progenitor - And/or
+            "HES1", "MKI67", "FABP7", "TTYH1", "HMGA2", "MEIS2", "SLC1A3", "FAM107A", "NKX2-1", "NHLH2", "DLX1", "OLIG2", "DLX6-AS1", "STMN2", "HOPX", "HES1", "NES", "SOX2", "EGFR", "DLL1", "CLDN10", "FAM107A", "GADD45G", "HES6", "SLC1A2") #Hypothalamic subclasses
+
+GeneLists[["OligList"]] = unique(c("APOD", "PMP22", "MAG", "OLIG1", "PLLP", "CSPG4", "PDGFRA", "NEU4", "TNS3", "FYN", "TCF7L2", "MAL", "MOG", "PLP1", "SERINC5", "TFRC", "OLIG1", "OLIG2", "CNP", "ST8SIA1", "CD9"))
+GeneLists[["AstroMicro"]] = unique(c("GJA1", "GFAP", "AQP4", "SLC7A10", "ALDH1L1", "AGT", "SLC1A3", "S100B",  "ALDOC", "SLC1A2", "ID3", "ASCL1", "BTG2", "APOE", "C1QB", "AIF1", "P2RY12", "MRC1"))
+GeneLists[["EpendyTanyList"]] = c("FOXJ1", "RAX", "ADM",  "EMX2", "LHX2", "TMEM212", "CRYM", "CCDC153", "RFX2", "RFX3", "RFX4", "NPAS3", "COL23A1", "CD59", "SLC17A8", "VCAN", "FRZB", "PENK", "COL25A1", "CACNA2D2", "STOML3", "TMEM212", "SLC7A11", "PCP4L1", "PLTP", "TGFB2", "NR2E1", "EPHB1", "P3H2", "NELL2", "FGF10", "RGCC", "GRIA2", "RLBP1", "SIX6", "SCN7A", "MEST", "IGFBP5", "RGS7BP")
+GeneLists[["EndoList"]] = c("SLCO1C1", "SLC38A5", "MYH11", "MRC1", "CLDN5", "ITM2A", "FLT1")
+GeneLists[["MuralPeriVLMCList"]] = c("VTN",  "COL1A1", "COL3A1", "LUM", "DCN", "PTGDS", "AMBP", "RGS5", "ACTA2", "TAGLN", "ABCC9", "KCNJ8") #3 GenMural, 6 VLMC, 2 Peri, 1 SMA
+
+
+
+
+###### CLUSTERING FUNCTION ###### 
+
+ClusterFunc_All_RNA = function(SeuFile){
+Filename = as.character(substitute(SeuFile))
+
+for(y in set.kparam){
+for(z in set.dim){
+for(v in set.res){
+DefaultAssay(SeuFile) = "integrated"
+SeuFile <- FindNeighbors(SeuFile, k.param=y, dims=1:z)
+SeuFile <- FindClusters(SeuFile, resolution = v)
+DefaultAssay(SeuFile) = "RNA"
+
+pdf(paste("ALLFETAL_", Filename, "_res", v, "_k", y, "_dim", z, "_umapSML_GLOTMP.pdf", sep=""), width=12, height=10)
+dimplot = DimPlot(SeuFile, reduction="umap", label=T)
+print(dimplot)
+dev.off()
+
+
+pdf(paste("ALLFETAL_", Filename, "_res", v, "_k", y, "_dim", z, "_umapLGE_GLOTMP.pdf", sep=""), width=25, height=25)
+dimplot = DimPlot(SeuFile, reduction="umap", label=T)
+print(dimplot)
+dev.off()
+
+###VLNS
+GeneLists2 = GeneLists
+DefaultAssay(SeuFile) = "RNA"
+for(g in names(GeneLists2)){
+ GeneLists2[[g]] = subset(GeneLists2[[g]], GeneLists2[[g]] %in% row.names(SeuFile))
+}
+
+
+AllVlns = list()
+
+for(d in names(GeneLists2)){
+Genes = GeneLists2[[d]]
+StorePlots = list()
+  for(x in Genes[1]){
+            plotA <- VlnPlot(SeuFile, features = x, pt.size = 0, same.y.lims = F,)
+            plotA <- plotA + coord_flip()+ theme(axis.ticks.x= element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank(), 
+                                                 axis.ticks.y = element_blank(), legend.position = "none", plot.title = element_text(size=12))+ labs(title = d, subtitle = Genes[1])
+            StorePlots[[x]] = plotA 
+            }
+  for(x in Genes[2:length(Genes)]){
+            plotB <- VlnPlot(SeuFile, features = x, pt.size = 0, same.y.lims = F,)
+            plotB <- plotB + coord_flip()+ theme(axis.ticks.x= element_blank(), axis.title.y=element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank(), 
+                      axis.ticks.y = element_blank(), legend.position = "none", axis.text.y = element_blank(), plot.title = element_text(size=12))
+           StorePlots[[x]] = plotB
+           }
+AllVlns[[d]] <- ggarrange(plotlist = StorePlots, widths=c(1.4, rep(1, length(Genes)-1)), ncol = 40,  nrow = 1)  
+}
+pdf(paste("ALLFETAL_", Filename, "_res", v, "_k", y, "_dim", z, "_AllMultiVlns_GLOTMP.pdf", sep=""), width=40, height=length(unique(SeuFile@active.ident)))
+print(AllVlns)
+dev.off()
+
+#Cell No
+CellNo = as.data.frame(table(SeuFile@meta.data$seurat_clusters))
+write.csv(CellNo, paste("ALLFETAL_", Filename, "_counts_k", y, "_dim", z, "_res", v, "_GLOTMP.csv", sep=""), row.names = F)
+}}
+
+#Feature Plots  
+FPList = list()  
+
+for(d in names(GeneLists2)){
+Genes = GeneLists2[[d]]
+
+FPSinglePage = list()
+FPSinglePage[[1]] = FeaturePlot(SeuFile, Genes[1], reduction="umap") + labs(title=paste(d, Genes[1]))
+for(p in seq(2, length(Genes), 1)){
+FPSinglePage[[p]] = FeaturePlot(SeuFile, Genes[p], reduction="umap") 
+}
+FPList[[d]] = ggarrange(plotlist = FPSinglePage, ncol=5, nrow=8)
+}
+
+pdf(paste("ALLFETAL_", Filename, "_dim", z, "_AllFPs_GLOTMP.pdf", sep=""), width = 25, height = 45)
+print(FPList)
+dev.off()
+}}
+
+
+```
+
+
+
+###############################################
+################## CLUSTERING ################# 
+###############################################
+```{r FIG-1-CLUST}
+KaZhouAll = readRDS("~/KaZhouAll_mt10_integrated.rds")
+
+set.dim = 30
+set.res = 1
+set.kparam = c(400)
+#ClusterFunc_All_RNA(KaZhouAll)
+
+KaZhouAll_UMAP = as.data.frame(KaZhouAll@reductions$umap@cell.embeddings)
+KaZhou_3D = read.csv("~/KaZhou_3D_coordinates.csv")
+row.names(KaZhou_3D) = KaZhou_3D$X
+
+#Assign Discrete Clusters 
+Ependymal = subset(KaZhouAll_UMAP, KaZhouAll_UMAP$UMAP_1 < 3 & KaZhouAll_UMAP$UMAP_1 > -4 & KaZhouAll_UMAP$UMAP_2 < -6)
+Endothelial = subset(KaZhouAll_UMAP, KaZhouAll_UMAP$UMAP_1 < 6 & KaZhouAll_UMAP$UMAP_1 > 3 & KaZhouAll_UMAP$UMAP_2 < -7)
+KaZhouAll_V2 = subset(KaZhouAll, cells = c(row.names(Ependymal), row.names(Endothelial)), invert=T)
+
+CheckInput = Endothelial
+CheckUMAP(KaZhouAll)
+
+set.dim = 30
+set.res = 1
+set.kparam = 400
+#ClusterFunc_All_RNA(KaZhouAll_V2)
+
+DefaultAssay(KaZhouAll_V2) = "integrated"
+KaZhouAll_V2 <- FindNeighbors(KaZhouAll_V2, k.param=400, dims=1:30)
+KaZhouAll_V2 <- FindClusters(KaZhouAll_V2, resolution = 1)
+
+Neuronal = subset(KaZhouAll_V2, idents = c(0,2,7,21,19))
+Astrocytes = subset(KaZhouAll_V2, idents = c(4))
+RadialGlia = subset(KaZhouAll_V2, idents = c(1, 18,22))
+Oligodendrocytes = subset(KaZhouAll_V2, idents = c(5, 13, 17))
+Microglia = subset(KaZhouAll_V2, idents = c(6, 20, 23))
+Dividing = subset(KaZhouAll_V2, idents = c(9, 11))
+ToSplit = subset(KaZhouAll_V2, idents = c(3,8))
+Progenitor = subset(KaZhouAll_V2, idents = 10)
+Tanycytes = subset(KaZhouAll_V2, idents = 12)
+Blood = subset(KaZhouAll_V2, idents = c(14))
+VLMC = subset(KaZhouAll_V2, idents = c(15))
+Mural = subset(KaZhouAll_V2, idents = c(16))
+
+
+set.dim = 30
+set.res = 1
+set.kparam = 500
+#ClusterFunc_All_RNA(ToSplit)
+#ClusterFunc_All_RNA(Progenitor)
+
+DefaultAssay(Progenitor) = "integrated"
+Progenitor <- FindNeighbors(Progenitor, k.param=100, dims=1:30)
+Progenitor <- FindClusters(Progenitor, resolution = 1)
+Neuronal_Extras = subset(Progenitor, idents = c(0))
+IPcells = subset(Progenitor, idents = c(0), invert=T)
+
+DefaultAssay(ToSplit) = "integrated"
+ToSplit <- FindNeighbors(ToSplit, k.param=500, dims=1:30)
+ToSplit <- FindClusters(ToSplit, resolution = 1)
+NeuronalProgenitors_2 = subset(ToSplit, idents = c(0))
+Neuronal_Extras2 =  subset(ToSplit, idents = c(1, 3))
+Neuroepithelial = subset(ToSplit, idents = c(0, 1, 3), invert=T)
+Neuronal_V2 = subset(KaZhouAll_V2, cells = c(colnames(Neuronal_Extras2), colnames(Neuronal_Extras), colnames(Neuronal)))
+
+InitialCellAssignments = GenerateMetaData(list("Ependymal" = Ependymal, "Endothelial" = Endothelial, "Neuronal" = Neuronal_V2, "Astrocytes" = Astrocytes, "Oligodendrocytes" = Oligodendrocytes, "Microglia" = Microglia, "Dividing" = Dividing, "Neuroepithelial" = Neuroepithelial,  "Tanycytes" = Tanycytes, "Blood" = Blood, "VLMC" = VLMC, "Mural" = Mural, "RadialGlia" = RadialGlia, "IntProgen" = IPcells,  "NeuronalProgenitors" = NeuronalProgenitors_2))
+KaZhouAll = AddMetaData(KaZhouAll, InitialCellAssignments, "InitialCellAssignments")
+InitialCellAssignments_3D = merge(InitialCellAssignments, KaZhou_3D, by.x = 0, by.y = "X")
+p = plot_ly(InitialCellAssignments_3D, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("~/CheckOverlap_initial.html", sep=""))
+
+
+
+#### Cleaning Assignments #### 
+#Ependymal & VLMC is fine
+Endothelial_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Endothelial" & InitialCellAssignments_3D$umap_2 < -1 & InitialCellAssignments_3D$umap_3 < -5)
+Neurons_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Neuronal" & InitialCellAssignments_3D$umap_1 > -2 & InitialCellAssignments_3D$umap_2 > -2 & InitialCellAssignments_3D$umap_3 < 2)
+NP2_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "NeuronalProgenitors" & InitialCellAssignments_3D$umap_1 > -2 & InitialCellAssignments_3D$umap_2 > -2 & InitialCellAssignments_3D$umap_3 < 2)
+Astrocytes_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Astrocytes" & InitialCellAssignments_3D$umap_1 > -4 & InitialCellAssignments_3D$umap_2 > -5 & InitialCellAssignments_3D$umap_3 > 1)
+RadialGlia_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "RadialGlia" & InitialCellAssignments_3D$umap_1 > -4 & InitialCellAssignments_3D$umap_2 > -5 & InitialCellAssignments_3D$umap_3 > 1)
+Oligodendrocytes_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Oligodendrocytes" & InitialCellAssignments_3D$umap_2 < -4 & InitialCellAssignments_3D$umap_3 < 5 & InitialCellAssignments_3D$umap_3 > -5)
+Microglia_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Microglia" & InitialCellAssignments_3D$umap_1 < -5 & InitialCellAssignments_3D$umap_2 > -5)
+Dividing_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Dividing" & InitialCellAssignments_3D$umap_1 > -6 & InitialCellAssignments_3D$umap_1 < 2 & InitialCellAssignments_3D$umap_2 > -6 & InitialCellAssignments_3D$umap_2 < 1 & InitialCellAssignments_3D$umap_3 > -0.5 & InitialCellAssignments_3D$umap_3 < 6)
+
+Neuroepithelial_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Neuroepithelial" & InitialCellAssignments_3D$umap_1 > -8 & InitialCellAssignments_3D$umap_1 < 0 & InitialCellAssignments_3D$umap_2 > -2 & InitialCellAssignments_3D$umap_2 < 3 & InitialCellAssignments_3D$umap_3 > -2.5 & InitialCellAssignments_3D$umap_3 < 3)
+IntProgenitors_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "IntProgen" & InitialCellAssignments_3D$umap_1 > -0 )
+Tanycytes_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Tanycytes" & InitialCellAssignments_3D$umap_1 > -2 & InitialCellAssignments_3D$umap_3 > 2 & InitialCellAssignments_3D$umap_3 < 8)
+Blood_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Blood" & InitialCellAssignments_3D$umap_1 < 0  & InitialCellAssignments_3D$umap_1 > -7  & InitialCellAssignments_3D$umap_2 > 1 & InitialCellAssignments_3D$umap_3 < -1)
+Mural_Clean = subset(InitialCellAssignments_3D, InitialCellAssignments_3D$Pop == "Mural" & InitialCellAssignments_3D$umap_2 > 1)
+
+
+#### Reassigning messy cells #### 
+KaZhouAll_Unassigned = subset(KaZhouAll, cells =c(Endothelial_Clean$Row.names, Neurons_Clean$Row.names, Astrocytes_Clean$Row.names, RadialGlia_Clean$Row.names, Oligodendrocytes_Clean$Row.names, Microglia_Clean$Row.names, Dividing_Clean$Row.names, Neuroepithelial_Clean$Row.names, IntProgenitors_Clean$Row.names,NP2_Clean$Row.names,  Tanycytes_Clean$Row.names, Blood_Clean$Row.names, Mural_Clean$Row.names, row.names(Ependymal), colnames(VLMC)), invert=T) #,
+KaZhouAll_Unassigned_3D = subset(KaZhou_3D, KaZhou_3D$X %in% colnames(KaZhouAll_Unassigned))
+
+InitialCellAssignments_wUnassigned = InitialCellAssignments_3D
+InitialCellAssignments_wUnassigned$Pop = ifelse(InitialCellAssignments_3D$Row.names %in% colnames(KaZhouAll_Unassigned), "Reassigned", InitialCellAssignments_3D$Pop)
+p = plot_ly(InitialCellAssignments_wUnassigned, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("./CheckOverlap_Reassigned.html", sep=""))
+
+
+
+Astrocytes_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > -1.5 & KaZhouAll_Unassigned_3D$umap_2 > -5  & KaZhouAll_Unassigned_3D$umap_2 < -2 & KaZhouAll_Unassigned_3D$umap_3 > 2.5)
+RadialGlial_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > -1.5 & KaZhouAll_Unassigned_3D$umap_2 > -2  & KaZhouAll_Unassigned_3D$umap_2 < 3.5 & KaZhouAll_Unassigned_3D$umap_3 > 2.5)
+Neurons_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > 0 & KaZhouAll_Unassigned_3D$umap_2 > -2 & KaZhouAll_Unassigned_3D$umap_3 < 2) #GT2_U
+NP2_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 > -2 & KaZhouAll_Unassigned_3D$umap_1 < 0 & KaZhouAll_Unassigned_3D$umap_2 > -2 & KaZhouAll_Unassigned_3D$umap_3 < 2)
+Oligodendrocytes_Reassigned = subset(KaZhouAll_Unassigned_3D,  KaZhouAll_Unassigned_3D$umap_2 < -4 & KaZhouAll_Unassigned_3D$umap_3 > -6 & KaZhouAll_Unassigned_3D$umap_3 < 5)
+Endothelial_Reassigned = subset(KaZhouAll_Unassigned_3D,   KaZhouAll_Unassigned_3D$umap_2 < -4 & KaZhouAll_Unassigned_3D$umap_3 < -6)
+Microglia_Reassigned = subset(KaZhouAll_Unassigned_3D,  KaZhouAll_Unassigned_3D$umap_1 < -5 & KaZhouAll_Unassigned_3D$umap_2 > -5 & KaZhouAll_Unassigned_3D$umap_2 < 2)
+Mural_Reassigned = subset(KaZhouAll_Unassigned_3D, KaZhouAll_Unassigned_3D$umap_1 < -4.5 & KaZhouAll_Unassigned_3D$umap_1 > -7 & KaZhouAll_Unassigned_3D$umap_2 > 1 & KaZhouAll_Unassigned_3D$umap_3 > -3 & KaZhouAll_Unassigned_3D$umap_3 < 2)
+Blood_Reassigned = subset(KaZhouAll_Unassigned_3D,  KaZhouAll_Unassigned_3D$umap_1 < 0  & KaZhouAll_Unassigned_3D$umap_1 > -3  & KaZhouAll_Unassigned_3D$umap_2 > 1 & KaZhouAll_Unassigned_3D$umap_3 < -2 | KaZhouAll_Unassigned_3D$umap_1 < -3  & KaZhouAll_Unassigned_3D$umap_1 > -7  & KaZhouAll_Unassigned_3D$umap_2 > 1 & KaZhouAll_Unassigned_3D$umap_3 < -5 )
+Tanycytes_Reassigned = subset(KaZhouAll_Unassigned_3D, ! KaZhouAll_Unassigned_3D$X %in% Astrocytes_Reassigned$X & KaZhouAll_Unassigned_3D$umap_1 > -2 &  KaZhouAll_Unassigned_3D$umap_1 < 2.5 & KaZhouAll_Unassigned_3D$umap_2  > 0 & KaZhouAll_Unassigned_3D$umap_3 > 3 & KaZhouAll_Unassigned_3D$umap_3 < 8) #GT2_U
+Neuroepithelial_Reassigned = subset(KaZhouAll_Unassigned_3D, ! KaZhouAll_Unassigned_3D$X %in% c(Neurons_Reassigned$X, Microglia_Reassigned$X, Mural_Reassigned$X) &  KaZhouAll_Unassigned_3D$umap_1 > -8 & KaZhouAll_Unassigned_3D$umap_1 < -0.5 & KaZhouAll_Unassigned_3D$umap_2 > -2 & KaZhouAll_Unassigned_3D$umap_2 < 3 & KaZhouAll_Unassigned_3D$umap_3 > -2.5 & KaZhouAll_Unassigned_3D$umap_3 < 3)
+Dividing_Reassigned = subset(KaZhouAll_Unassigned_3D,  ! KaZhouAll_Unassigned_3D$X %in%  c(Astrocytes_Reassigned$X, Neurons_Reassigned$X, Oligodendrocytes_Reassigned$X, Microglia_Reassigned$X, Neuroepithelial_Reassigned$X) & KaZhouAll_Unassigned_3D$umap_1 > -6 & KaZhouAll_Unassigned_3D$umap_1 < 1 & KaZhouAll_Unassigned_3D$umap_2 > -6 & KaZhouAll_Unassigned_3D$umap_2 < 1 & KaZhouAll_Unassigned_3D$umap_3 > -1 & KaZhouAll_Unassigned_3D$umap_3 < 6)
+NeuronalProgenitors_Reassigned = subset(KaZhouAll_Unassigned_3D, ! KaZhouAll_Unassigned_3D$X %in%  c(Astrocytes_Reassigned$X, Neurons_Reassigned$X, Oligodendrocytes_Reassigned$X, Dividing_Reassigned$X) & KaZhouAll_Unassigned_3D$umap_1 > -0 & KaZhouAll_Unassigned_3D$umap_1 < 3.5 & KaZhouAll_Unassigned_3D$umap_2 > -5 & KaZhouAll_Unassigned_3D$umap_2 < 1.2 & KaZhouAll_Unassigned_3D$umap_3 > -2 & KaZhouAll_Unassigned_3D$umap_3 < 4 )
+
+InitialCellAssignments_wUnassigned2 = InitialCellAssignments_wUnassigned
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Astrocytes_Reassigned$X, "Astrocytes", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% RadialGlial_Reassigned$X, "RadialGlia", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Neurons_Reassigned$X, "Neuronal", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% NP2_Reassigned$X, "NeuronalProgenitors", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Oligodendrocytes_Reassigned$X, "Oligodendrocytes", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Endothelial_Reassigned$X, "Endothelial", InitialCellAssignments_wUnassigned2$Pop)
+
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Microglia_Reassigned$X, "Microglia", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Mural_Reassigned$X, "Mural", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Blood_Reassigned$X, "Blood", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Tanycytes_Reassigned$X, "Tanycytes", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Neuroepithelial_Reassigned$X, "Neuroepithelial", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Dividing_Reassigned$X, "Dividing", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% IntProgenitors_Clean$X, "IntProgen", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Pop %in% "Ependymal" & InitialCellAssignments_wUnassigned2$umap_3 < 0, "Neuronal", InitialCellAssignments_wUnassigned2$Pop)
+
+Unassigned3 = subset(InitialCellAssignments_wUnassigned2, InitialCellAssignments_wUnassigned2$Pop %in% "Reassigned")
+Blood_Extra = subset(Unassigned3, Unassigned3$umap_3 < -4)
+VLMC_Extra = subset(Unassigned3, Unassigned3$umap_3 > -4 & Unassigned3$umap_1 < -2) 
+NE_Extra = subset(Unassigned3, Unassigned3$umap_3 > -4 & Unassigned3$umap_1 > -2)
+
+
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% Blood_Extra$Row.names, "Blood", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% VLMC_Extra$Row.names, "VLMC", InitialCellAssignments_wUnassigned2$Pop)
+InitialCellAssignments_wUnassigned2$Pop = ifelse(InitialCellAssignments_wUnassigned2$Row.names %in% NE_Extra$Row.names, "Neuroepithelial", InitialCellAssignments_wUnassigned2$Pop)
+
+p = plot_ly(InitialCellAssignments_wUnassigned2, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("~/CheckOverlap_Reassigned2.html", sep=""))
+
+FirstpassClustering = InitialCellAssignments_wUnassigned2
+#write.csv(FirstpassClustering, "FirstpassClustering.csv")
+
+#### More detailed clustering of relevant cell population #### 
+#Oligodendrocytes
+OLIG = subset(FirstpassClustering, FirstpassClustering$Pop %in% "Oligodendrocytes")
+OLIG_Seu = subset(KaZhouAll, cells = OLIG$Row.names)
+set.dim = 30
+set.res = 1
+set.kparam = 500
+#ClusterFunc_All_RNA(OLIG_Seu) 
+
+DefaultAssay(OLIG_Seu) = "integrated"
+OligCheck1 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 < 0 & KaZhouAll_UMAP$UMAP_2 < 0)
+OligCheck2 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1  > 0 & KaZhouAll_UMAP$UMAP_2 < 0) #GT_2
+OligCheck3 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 < 0 & KaZhouAll_UMAP$UMAP_2 < 0.5 & KaZhouAll_UMAP$UMAP_2 < 7)
+OligCheck4 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1  > 0 & KaZhouAll_UMAP$UMAP_2  > 0 & KaZhouAll_UMAP$UMAP_2 < 8)#GT_2 x2
+OligCheck5 = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_Seu) & KaZhouAll_UMAP$UMAP_1 > 3 &  KaZhouAll_UMAP$UMAP_2 > 10.5 & KaZhouAll_UMAP$UMAP_2 < 14)
+
+OLIG_Seu2 = subset(OLIG_Seu, cells = c(row.names(OligCheck1), row.names(OligCheck2), row.names(OligCheck3), row.names(OligCheck4), row.names(OligCheck5)), invert=T)
+
+
+set.dim = 30
+set.res = 1
+set.kparam = 400
+#ClusterFunc_All_RNA(OLIG_Seu2) 
+DefaultAssay(OLIG_Seu2)= "integrated"
+OLIG_Seu2 <- FindNeighbors(OLIG_Seu2, k.param=500, dims=1:30)
+OLIG_Seu2 <- FindClusters(OLIG_Seu2, resolution = 1)
+OLIG_Dividing = subset(OLIG_Seu2, idents = c(4))
+OLIG_Immature = subset(OLIG_Seu2, idents = c(0))
+OLIG_Intermediate = subset(OLIG_Seu2, idents = c(3,5))
+OLIG_Mature = subset(OLIG_Seu2, idents = c(2))
+OLIG_ToSplit = subset(OLIG_Seu2, idents = c(1))
+
+OLIG_Immature_Extras = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_ToSplit) & KaZhouAll_UMAP$UMAP_2 < 12)
+OLIG_Mature_Extras = subset(KaZhouAll_UMAP, row.names(KaZhouAll_UMAP) %in% colnames(OLIG_ToSplit) & KaZhouAll_UMAP$UMAP_2 > 12)
+
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck1), colnames(OLIG_Intermediate)), "Oligodendrocytes [Intermediate]", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck2), colnames(OLIG_Mature), row.names(OLIG_Mature_Extras)), "Oligodendrocytes [Mature]", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(colnames(OLIG_Immature), row.names(OLIG_Immature_Extras)), "Oligodendrocytes [Immature]", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck3)), "IntProgen", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% row.names(OligCheck5), "Neuroepithelial", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(row.names(OligCheck4), colnames(OLIG_Dividing)), "Oligodendrocytes [Dividing]", FirstpassClustering$Pop)
+
+
+p = plot_ly(FirstpassClustering, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
+htmlwidgets::saveWidget(p, paste("./CheckOverlap_Reassigned3.html", sep=""))
+
+
+
+#Mural
+Mural_2 = subset(FirstpassClustering, FirstpassClustering$Pop %in% "Mural")
+Mural_2_Seu = subset(KaZhouAll, cells = Mural_2$Row.names)
+set.dim = 30
+set.res = 1
+set.kparam = c(5 )
+#ClusterFunc_All_RNA(Mural_2_Seu)
+DefaultAssay(Mural_2_Seu)= "integrated"
+Mural_2_Seu <- FindNeighbors(Mural_2_Seu, k.param=20, dims=1:30)
+Mural_2_Seu <- FindClusters(Mural_2_Seu, resolution = 1)
+vSMC = subset(Mural_2_Seu, idents = c(4))
+Pericytes = subset(Mural_2_Seu, idents = c(4), invert=T)
+
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% colnames(Pericytes), "Pericytes", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% colnames(vSMC), "vSMC", FirstpassClustering$Pop)
+
+
+IntProg = subset(FirstpassClustering, FirstpassClustering$Pop %in% "IntProgen")
+IntProgSeu = subset(KaZhouAll, cells = IntProg$Row.names)
+set.dim = 30
+set.res = 1
+set.kparam = c(50)
+#ClusterFunc_All_RNA(NeurProgSeu)
+
+DefaultAssay(IntProgSeu)= "integrated"
+IntProgSeu <- FindNeighbors(IntProgSeu, k.param=50, dims=1:30)
+IntProgSeu <- FindClusters(IntProgSeu, resolution = 1)
+Neuronal_Extras3 = subset(IntProgSeu, idents = c(2,3))
+IPCs = subset(IntProgSeu, idents = c(2,3), invert=T)
+
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% c(colnames(IPCs)), "IntProgen", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Row.names %in% colnames(Neuronal_Extras3), "Neuronal", FirstpassClustering$Pop)
+FirstpassClustering$Pop = ifelse(FirstpassClustering$Pop %in% "Ependymal" & FirstpassClustering$umap_3 < 0, "Neuronal", FirstpassClustering$Pop)
+
+FirstpassClustering$Pop = gsub("NeuronalProgenitors", "Neuroepithelial", FirstpassClustering$Pop)
+CleanedClusters_Figure1 = FirstpassClustering
+#write.csv(CleanedClusters_Figure1, "CleanedClusters_Figure1_v1.csv")
+
+########### CLEAN INTERMED PROGENITORS
+CleanedClusters_Figure1 = read.csv("~/CleanedClusters_Figure1_v1.csv", row.names =2)
+
+ClusterIDs = CleanedClusters_Figure1 %>% dplyr::select(Pop)
+KaZhouAll = AddMetaData(KaZhouAll, ClusterIDs, "PopClusters")
+Idents(KaZhouAll) = "PopClusters"
+IntProg2 = subset(KaZhouAll, idents = c("Neuronal"))
+set.dim = 30
+set.res = c(1)
+set.kparam = c(10)
+#ClusterFunc_All_RNA(IntProg2)
+
+DefaultAssay(IntProg2) = "integrated"
+IntProg2 <- FindNeighbors(IntProg2, k.param=50, dims=1:30)
+IntProg2 <- FindClusters(IntProg2, resolution = 2)
+IPC2 = subset(IntProg2, idents = c(9,12))
+IPC3 = subset(IntProg2, idents = c(15))
+
+CleanedClusters_Figure1$Pop = ifelse(row.names(CleanedClusters_Figure1) %in% colnames(IPC2), "IntProgen_2", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = ifelse(row.names(CleanedClusters_Figure1) %in% colnames(IPC3), "IntProgen_3", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = ifelse(CleanedClusters_Figure1$Pop %in% "IntProgen", "IntProgen_1", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = ifelse(CleanedClusters_Figure1$Pop %in% "Dividing", "cRGC", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = gsub("RadialGlia", "qRGC", gsub("Neuroepithelial", "tRGC",  CleanedClusters_Figure1$Pop))
+
+write.csv(CleanedClusters_Figure1, "CleanedClusters_Figure1_v2.csv")
+```
+
+###############################################
+############## ORGANIZE METADATA ##############
+###############################################
+```{r}
+#KaZhouAll = readRDS("~/KaZhouAll_mt10_integrated.rds")
+#CleanedClusters_Figure1 = read.csv("~/CleanedClusters_Figure1_v2.csv", row.names =1)
+
+PopOrder = c("tRGC", "cRGC", "qRGC", "IntProgen_1", "IntProgen_2", "IntProgen_3", "Neuronal", "Oligodendrocytes [Dividing]",  "Oligodendrocytes [Immature]", "Oligodendrocytes [Intermediate]",  "Oligodendrocytes [Mature]", "Astrocytes", "Ependymal", "Tanycytes", "Microglia",   "Pericytes", "vSMC",  "VLMC",   "Endothelial",  "Blood")
+
+#Cluster annotations
+Fig1Assignments = CleanedClusters_Figure1 %>% dplyr::select(Pop)
+KaZhouAll = AddMetaData(KaZhouAll, Fig1Assignments, "CellAnnotations")
+
+KaZhouAll@meta.data$Timepoint = gsub("_.*", "", gsub("T", "", gsub("CS13", "GW6", gsub("CS14", "GW7", gsub("CS15",  "GW7", gsub("CS22", "GW10",  KaZhouAll@meta.data$sample))))))
+KaZhouAll@meta.data$Timepoint_Study = ifelse(KaZhouAll@meta.data$Study == "Zhou", paste(KaZhouAll@meta.data$Timepoint, "[Zhou]"), KaZhouAll@meta.data$Timepoint)
+
+KaZhouAll@meta.data$Timepoint = factor(KaZhouAll@meta.data$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25" ))
+KaZhouAll@meta.data$Timepoint_Study = factor(KaZhouAll@meta.data$Timepoint_Study, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+
+#3D UMAP
+colnames(CleanedClusters_Figure1) = c("Row.names", "Pop", "UMAP_1", "UMAP_2", "UMAP_3")
+CleanedClusters_Figure1_Meta = merge(CleanedClusters_Figure1, KaZhouAll@meta.data, by = 0)
+```
+
+###############################################
+############ TIMEPOINTS 3D UMAPs ##############
+###############################################
+```{r}
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, sizes = 1, size = 1, color = ~Timepoint, colors = TimepointColors_Fetal)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1_3D_BySample.html", sep=""))
+
+#Timepoints by sample
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, sizes = 1, size = 1,color = ~Timepoint_Study, colors = TimepointColors_FetalZhou)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1Supp_3D_BySampleStudy.html", sep=""))
+```
+
+###############################################
+############ CLUSTER ASSIGN PLOTS #############
+###############################################
+```{r}
+#By Assignment
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, size = 1, sizes = 1, color = ~CellAnnotations, colors = CellPopColors, type="scatter3d")
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1_3D_AllAssignments.html", sep=""))
+
+#UMAPs for supplemental
+Plot = list()
+for(x in c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25")){
+Idents(KaZhouAll) = "Timepoint_Study"
+Subs = subset(KaZhouAll, idents = x)  
+Idents(Subs) = "CellAnnotations"
+
+Plot[[x]] = DimPlot(Subs,  cols = CellPopColors, raster=F, pt.size = 0.1) + xlim(-10, 16) + ylim(-12, 16)+theme(axis.title = element_blank(), axis.ticks = element_line(color = "lightgrey"), axis.text = element_blank(), axis.line  = element_line(color = "lightgrey")) +NoLegend()
+}
+Combined = ggarrange(plotlist = Plot, ncol = 4, nrow=4)
+
+pdf(paste(FilePath, "Fig1Supp_SamplesSplit.pdf", sep=""), width = 10, height = 10)
+print(Combined)
+dev.off()
+```
+
+###############################################
+############## STACKED BAR PLOT ###############
+###############################################
+```{r}
+# Main Text
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "Timepoint")
+for(x in unique(CleanedClusters_Figure1_Meta$Timepoint)){
+Subs= subset(CleanedClusters_Figure1_Meta, CleanedClusters_Figure1_Meta$Timepoint == x) 
+MetaTable = as.data.frame(table(Subs$Pop))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$Timepoint = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents2 = merge(CompilePercents, CellPopColors, by.x = "Var1", by.y = 0)
+CompilePercents2$Var1 = factor(CompilePercents2$Var1, levels = rev(PopOrder))
+CompilePercents2$Timepoint = factor(CompilePercents2$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25"))
+  
+StackedPlot = ggplot(CompilePercents2, aes(fill=Var1, y=Percent, x=Timepoint)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text = element_text(size = 12), axis.title.y = element_text(size = 12), legend.title = element_blank()) + scale_fill_manual(values = CellPopColors)
+
+pdf(paste(FilePath, "Fetal_ForPaper_StackedbyPercent.pdf", sep=""), width = 7.5, height = 2.8)
+print(StackedPlot)
+dev.off()
+
+# Supplemental
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "Timepoint_Study")
+for(x in unique(CleanedClusters_Figure1_Meta$Timepoint_Study)){
+Subs= subset(CleanedClusters_Figure1_Meta, CleanedClusters_Figure1_Meta$Timepoint_Study == x) 
+MetaTable = as.data.frame(table(Subs$CellAnnotations))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$Timepoint_Study = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents$Var1 = factor(CompilePercents$Var1, levels = rev(PopOrder))
+CompilePercents$Timepoint = factor(CompilePercents$Timepoint, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+  
+StackedPlot = ggplot(CompilePercents, aes(fill=Var1, y=Percent, x=Timepoint)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text = element_text(size = 12), axis.title.y = element_text(size = 12), legend.title = element_blank()) + scale_fill_manual(values = CellPopColors)
+
+pdf(paste(FilePath, "Fetal_ForPaper_Supp_StackedbyPercent_13DEC22.pdf", sep=""), width = 8, height = 2.8)
+print(StackedPlot)
+dev.off()
+```
+
+###############################################
+################## DOT PLOT ###################
+###############################################
+```{r}
+KaZhouAll@meta.data$CellAnnotations = factor(KaZhouAll@meta.data$CellAnnotations, levels = rev(PopOrder))
+Idents(KaZhouAll) = "CellAnnotations"
+DefaultAssay(KaZhouAll) = "RNA"
+DP = DotPlot(KaZhouAll, assay = "RNA", features= unique(c("HMGA2", "IGFBP5", "COL2A1", "MKI67", "TOP2A", "CDK1", "VCAM1", "NES", "SOX2", "VIM",  "FABP7", "TTYH1", "SLC1A3",  "ASCL1", "EGFR", "NHLH2",  "NEUROD1", "NEUROG2",   "STMN2", "SYT1", "OLIG1","OLIG2","APOD","PDGFRA",  "MBP", "PLP1", "MAG", "MOG",  "GJA1", "GFAP", "AQP4", "ALDOC", "SLC1A2",  "CCDC153",  "CRYM", "C1QB", "AIF1", "RGS5",  "KCNJ8", "ABCC9", "ACTA2", "TAGLN", "LUM", "DCN", "COL1A1",  "PDGFRB", "CLDN5", "ITM2A", "FLT1", "HBA2", "OLIG1")), dot.min = 0.15,  cols = c("#FFFFFF", BlueMedDark)) + theme(axis.text.x = element_text(size=10, face="italic", angle = 90, vjust = 0.5, hjust=1), axis.text.y = element_text(size=10), legend.title = element_text(size=8)) + ylab("") #
+
+pdf(paste(FilePath, "Fetal_ForPaper_Fig1DotPlot.pdf", sep=""), width = 15, height = 5)
+print(DP)
+dev.off()
+```
+
+###############################################
+############# SUPPLEMENTAL TABLES #############
+###############################################
+```{r}
+#By Sample
+CleanedClusters_Figure1_Meta$count = 1
+CleanedClusters_Figure1_Meta$Row.names = NULL
+SupTable1 = CleanedClusters_Figure1_Meta %>% group_by(Timepoint_Study) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTable1, "SciAdv_SupTable1.csv", row.names = F)
+
+
+#By Cluster
+KaZhouAll@meta.data$count = 1
+SupTable4 = KaZhouAll@meta.data %>% group_by(CellAnnotations) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+SupTable4$CellAnnotations = factor(SupTable4$CellAnnotations, levels = PopOrder)
+SupTable4 = SupTable4[order(SupTable4$CellAnnotations), ]
+write.csv(SupTable4, "SciAdv_SupTable4.csv", row.names = F)
+
+#Differential Expression
+DefaultAssay(KaZhouAll) = "RNA"
+Idents(KaZhouAll) = "CellAnnotations"
+Fig1_DEGs = FindAllMarkers(KaZhouAll, only.pos = T)
+Fig1_DEGsPos = subset(Fig1_DEGs, Fig1_DEGs$p_val_adj < 0.05 & Fig1_DEGs$avg_log2FC > 0.5)
+write.csv(Fig1_DEGsPos, "Fig1_DEGsPos.csv")
+```
+
+

@@ -1,0 +1,515 @@
+---
+title: "FIGURE 3 ANALYSIS"
+output: html_notebook
+---
+
+###############################################
+#################### SETUP ####################
+###############################################
+
+#Import packages
+```{r}
+library(tidyverse)
+library(igraph)
+library(monocle3)
+library(Seurat)
+library(plotly)
+library(ggalluvial)
+```
+
+#Colors
+```{r}
+LightPink =   "#ffc2d4"
+MedPink =     "#ff9ebb"
+DarkPink =    "#ff7aa2"
+DarkRed =     "#9e1b44"
+LightRed =    "#d64050"
+DarkOrange =  "#f36c44"
+LightOrange = "#faad60"
+Mustard =     "#fecf29"
+LightYellow = "#fee08b"
+GreenLighest ="#aad576"
+GreenMedLight="#78a02d"
+GreenMedDark ="#538d22"
+GreenDark =   "#245501"
+BlueDark =    "#133c55"
+BlueMedDark = "#386fa4"
+BlueMedLight ="#59a5d8"
+BlueLighest = "#84d2f6"
+LightPurple = "#b185db"
+DarkPurple =  "#7251b5"
+Grey =        "#666666"
+HeatmapBlue = BlueMedDark
+
+NucleiColors = c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed,  "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark,   "SMN" =BlueMedLight, "MN"= BlueLighest, "ZI" = LightPurple,  "Unassigned" = "darkgrey", "Fetal" = "lightgrey")
+
+#ClassColors = c("Glutaminergic" = "#d64151", "GABAergic" = "#386fa4","Histaminergic" = "#aad576", "Unknown" =  "darkgrey", "Fetal" =  "lightgrey")
+
+SpeciesTimeColors = c("HumanAdult" = DarkRed,  "HumanDevelopment"= LightOrange, "MouseAdult"= GreenMedDark, "MouseDevelopment"  = BlueMedLight)
+
+Fig3_SeuColors = c(LightPink, MedPink, DarkPink, DarkRed,  LightRed, DarkOrange, LightOrange,  Mustard, LightYellow, GreenLighest,  GreenMedLight, GreenMedDark, GreenDark,   BlueDark,  BlueMedDark, BlueMedLight, BlueLighest,  LightPurple,  DarkPurple) #19
+
+```
+
+
+###############################################
+############### INTEGRATE DATA ################
+###############################################
+
+```{r}
+#This was done on an X1_x16XL AWS server
+
+#HUMAN DATA
+EdKaZhou = readRDS("~/EdKaZhouHypoNeurons_mt10_integrated.rds")
+EdKaZhou@meta.data$Dataset = ifelse(EdKaZhou@meta.data$Age %in% c(29, 42, 50), "Siletti", "Zhou")
+EdKaZhou@meta.data$Dataset = ifelse(EdKaZhou@meta.data$sample %in% c("CS22_2_hypo", "CS22_hypo", "GW16_hypo", "GW18_hypo", "GW20_34_hypo", "GW22T_hypo1", "GW25_3V_hypo", "GW19_hypo"), "Herb", EdKaZhou@meta.data$Dataset)
+DefaultAssay(EdKaZhou) = "RNA"
+EdKaZhouNeurons = SplitObject(EdKaZhou, split.by = "Dataset")
+
+#HYPOMAP DATA
+hypoMap = readRDS("hypoMap.rds")
+hypoMap = ConvertGeneNames(hypoMap, reference.names = row.names(Neuro.combined), homolog.table = "https://seurat.nygenome.org/azimuth/references/homologs.rds")
+#saveRDS(hypoMap, "~/hypoMapHuman.rds")
+#hypoMap = readRDS("~/hypoMapHuman.rds")
+Idents(hypoMap) = "Dataset"
+hypoMap = subset(hypoMap, idents = c("Dowsett10xnuc", "RomanovDev10x", "KimDev10x"), invert=T)
+Idents(hypoMap) = "C2_named"
+hypoMap = subset(hypoMap, idents = c("C2-1: Neurons"))
+hypoMapData = SplitObject(hypoMap, split.by = "Dataset")
+
+#KIM DATA
+Kim_Meta = read.csv("~/GSE132355_E10-P45_umap_data.csv")
+Kim_MetaNeurons = subset(Kim_Meta, Kim_Meta$Cluster %in% c("GE/POA", "VMH", "POA/SCN", "SMN", "PVH & SON", "MMN", "PMN", "LH", "ARC", "POA", "SCN", "DMH/ID", "Hypothalamic neurons"))
+Kim_Data = readRDS("~/GSE132355_E10-P45_log2cpm.rds")
+Kim_Data = CreateSeuratObject(Kim_Data, project= "KimDev")
+Kim_Data = subset(Kim_Data, cells = Kim_MetaNeurons$X.1)
+DefaultAssay(Kim_Data) = "RNA"
+Kim_Data = ConvertGeneNames(Kim_Data, reference.names = row.names(EdKaZhou), homolog.table = "https://seurat.nygenome.org/azimuth/references/homologs.rds")
+Kim_Data@meta.data$Dataset = "KimDev"
+#saveRDS(Kim_Data, "~/KimDevNeuronsHuman.rds")
+#KimDev = readRDS("KimDevNeuronsHuman.rds")
+
+
+#ROMANOV DATA
+Romanov_Data = readRDS("~/GSE132730_TractNAE_integrated.rds")
+Idents(Romanov_Data) = "Class"
+Romanov_Data = subset(Romanov_Data, idents = "Neurons")
+DefaultAssay(Romanov_Data) = "RNA"
+Romanov_Data = ConvertGeneNames(Romanov_Data, reference.names = row.names(EdKaZhou), homolog.table = "https://seurat.nygenome.org/azimuth/references/homologs.rds")
+Romanov_Data@meta.data$Dataset = "RomanovDev"
+#saveRDS(Romanov_Data, "~/RomanovDevNeuronsHuman.rds")
+#RomanovDev = readRDS("~/RomanovDevNeuronsHuman.rds")
+
+Hypo.list = c("Romanov" = RomanovDev, "Kim" = KimDev, EdKaZhouNeurons, hypoMapData)
+
+CommonGenes = intersect(row.names(RomanovDev@assays$RNA@data), row.names(KimDev@assays$RNA@data))
+CommonGenes = intersect(CommonGenes, row.names(EdKaZhouNeurons@assays$RNA@data))
+CommonGenes = intersect(CommonGenes, row.names(hypoMapData@assays$RNA@data))
+write.csv(as.data.frame(CommonGenes), "CommonGenes_Fig3.csv")
+rm(hypoMap)
+rm(EdKaZhou)
+
+
+for(n in names(Hypo.list)){
+  DefaultAssay(Hypo.list[[n]]) = "RNA"
+  Hypo.list[[n]]  = DietSeurat(Hypo.list[[n]])
+  MT.genes = grep(pattern="^MT-", x = row.names(Hypo.list[[n]]), value=T)
+  percent.mt = Matrix::colSums(Hypo.list[[n]]@assays[["RNA"]][MT.genes, ])/Matrix::colSums(Hypo.list[[n]]@assays[["RNA"]])
+  Hypo.list[[n]] = AddMetaData(Hypo.list[[n]], percent.mt, "percent.mt")
+  Hypo.list[[n]] <- NormalizeData(Hypo.list[[n]])
+  Hypo.list[[n]] <- FindVariableFeatures(Hypo.list[[n]], selection.method = "vst", nfeatures = 2000)
+}
+feat <- SelectIntegrationFeatures(object.list = Hypo.list)
+
+for(n in names(Hypo.list)){
+  Hypo.list[[n]] = ScaleData(Hypo.list[[n]], features = feat, verbose = FALSE)
+  Hypo.list[[n]] = RunPCA(Hypo.list[[n]], features = feat, verbose = FALSE)
+}
+
+Hypo.anchors <- FindIntegrationAnchors(object.list = Hypo.list, anchor.features = feat, reduction = "rpca")
+Hypo.combined <- IntegrateData(anchorset = Hypo.anchors)
+
+#saveRDS(Hypo.combined, "~/Hypothalamus_HumanMouseInt.rds")
+
+Hypo.combined = ScaleData(Hypo.combined, vars.to.regress = "percent.mt")
+Hypo.combined = RunPCA(Hypo.combined)
+Hypo.combined = RunHarmony(Hypo.combined, group.by.vars = "DatasetClean")
+Hypo.combined = RunUMAP(Hypo.combined, reduction = "harmony", dims = 1:30)
+saveRDS(Hypo.combined, "~/Hypothalamus_HumanMouseInt.rds")
+```
+
+###############################################
+############# ORGANIZE METADATA ###############
+###############################################
+```{r}
+#HumMouInt = readRDS("~/Hypothalamus_HumanMouseInt.rds")
+DefaultAssay(HumMouInt) = "integrated"
+HumMouInt = RunUMAP(HumMouInt, n.components = 3, reduction = "harmony", dims = 1:30)
+
+HumMouInt@meta.data$Species = ifelse(HumMouInt@meta.data$Dataset %in% c("Herb", "Siletti", "Zhou"), "Human", "Mouse")
+HumMouInt@meta.data$Human = ifelse(HumMouInt@meta.data$Dataset %in% c("Herb", "Zhou"), "HumanDevelopment", "None")
+HumMouInt@meta.data$Human = ifelse(HumMouInt@meta.data$Dataset %in% c("Siletti"), "HumanAdult", HumMouInt@meta.data$Human)
+HumMouInt@meta.data$SpeciesStage = ifelse(HumMouInt@meta.data$Human %in% c("None") & HumMouInt@meta.data$Dataset %in% c("RomanovDev", "KimDev"), "MouseDevelopment", HumMouInt@meta.data$Human)
+HumMouInt@meta.data$SpeciesStage = ifelse(HumMouInt@meta.data$SpeciesStage %in% c("None"), "MouseAdult", HumMouInt@meta.data$SpeciesStage)
+
+#Reorganize HypoMap metadata to a similar granularity
+HumMouInt@meta.data$Region_summarized[is.na(HumMouInt@meta.data$Region_summarized)] = "NA" 
+HumMouInt@meta.data$Region_summarized_Clean = gsub("Paraventricular hypothalamic nucleus", "PVH",gsub("NA", "Unassigned", gsub("\\(Pre\\)Mammillary region", "MN", gsub("Periventricular hypothalamic nucleus, posterior part", "PVH", gsub("Zona incerta", "ZI", gsub("Lateral hypothalamic area", "LH", gsub("Ventromedial hypothalamic nucleus", "VMH", gsub("Arcuate hypothalamic nucleus", "ARC", gsub("Anterior hypothalamic nucleus", "PO", gsub("Suprachiasmatic nucleus", "SCN", gsub("\\(Anterior/Preoptic\\)Periventricular region", "PVH", gsub("Dorsomedial nucleus of the hypothalamus", "DMH", gsub("Medial preoptic area", "PO", gsub("Lateral preoptic area", "PO", gsub("Tuberal nucleus", "TM", gsub("Periventricular hypothalamic nucleus, intermediate part", "PVH", HumMouInt@meta.data$Region_summarized))))))))))))))))
+```
+
+###############################################
+######### GENERATE 3D UMAPS - MAIN ############
+###############################################
+```{r}
+######### 3D UMAP BY TIME/SPECIES ########### 
+#############################################
+
+Get3D_coords_Fig3 = as.data.frame(HumMouInt@reductions$umap@cell.embeddings)
+Get3D_coords_Fig3$Barcodes = row.names(Get3D_coords_Fig3)
+
+## UMAP by Sample - #weird workaround because otherwise it way layered by SpeciesStage
+CellAssignments_3D = merge(HumMouInt@meta.data, Get3D_coords_Fig3, by = 0)
+CellAssignments_3D$order = sample(1:20, dim(CellAssignments_3D)[1], replace=T)
+CellAssignments_3D$order2 = CellAssignments_3D$order
+for(x in c("HumanAdult","HumanDevelopment", "MouseAdult","MouseDevelopment")){
+ystart = 0
+for(y in seq(1,20, 1)){
+CellAssignments_3D$order2 = ifelse(CellAssignments_3D$SpeciesStage %in% x & CellAssignments_3D$order > ystart & CellAssignments_3D$order <= y, paste(y, x), CellAssignments_3D$order2) # CellAssignments_3D$order2)
+ystart = ystart+1
+}
+}
+
+Fig3Colors= c("6 HumanAdult" = DarkRed, "1 HumanAdult" = DarkRed, "1 MouseAdult" = GreenMedDark, "9 MouseDevelopment" = BlueMedLight, "7 MouseDevelopment" = BlueMedLight, "5 MouseDevelopment" = BlueMedLight, "3 HumanDevelopment"  = LightOrange, "4 MouseAdult" = GreenMedDark, "10 MouseAdult" = GreenMedDark, "3 MouseDevelopment" = BlueMedLight, "9 MouseAdult" = GreenMedDark, "10 HumanDevelopment"  = LightOrange, "3 MouseAdult" = GreenMedDark, "7 MouseAdult" = GreenMedDark, "6 MouseDevelopment" = BlueMedLight, "5 MouseAdult" = GreenMedDark, "4 HumanAdult" = DarkRed, "8 MouseAdult" = GreenMedDark, "8 MouseDevelopment" = BlueMedLight, "6 MouseAdult" = GreenMedDark, "9 HumanDevelopment"  = LightOrange, "4 MouseDevelopment" = BlueMedLight, "10 HumanAdult" = DarkRed, "10 MouseDevelopment" = BlueMedLight, "5 HumanAdult" = DarkRed, "6 HumanDevelopment"  = LightOrange, "7 HumanDevelopment"  = LightOrange, "12 MouseAdult" = GreenMedDark, "4 HumanDevelopment"  = LightOrange, "8 HumanAdult" = DarkRed, "12 HumanDevelopment"  = LightOrange, "8 HumanDevelopment"  = LightOrange, "12 HumanAdult" = DarkRed, "1 MouseDevelopment" = BlueMedLight, "9 HumanAdult" = DarkRed, "12 MouseDevelopment" = BlueMedLight, "5 HumanDevelopment"  = LightOrange, "1 HumanDevelopment"  = LightOrange, "3 HumanAdult" = DarkRed, "7 HumanAdult" = DarkRed, "16 HumanAdult" = DarkRed, "11 HumanAdult" = DarkRed, "11 MouseAdult" = GreenMedDark, "19 MouseDevelopment" = BlueMedLight, "17 MouseDevelopment" = BlueMedLight, "15 MouseDevelopment" = BlueMedLight, "13 HumanDevelopment"  = LightOrange, "14 MouseAdult" = GreenMedDark, "20 MouseAdult" = GreenMedDark, "13 MouseDevelopment" = BlueMedLight, "19 MouseAdult" = GreenMedDark, "20 HumanDevelopment"  = LightOrange, "13 MouseAdult" = GreenMedDark, "17 MouseAdult" = GreenMedDark, "16 MouseDevelopment" = BlueMedLight, "15 MouseAdult" = GreenMedDark, "14 HumanAdult" = DarkRed, "18 MouseAdult" = GreenMedDark, "18 MouseDevelopment" = BlueMedLight, "16 MouseAdult" = GreenMedDark, "19 HumanDevelopment"  = LightOrange, "14 MouseDevelopment" = BlueMedLight, "20 HumanAdult" = DarkRed, "20 MouseDevelopment" = BlueMedLight, "15 HumanAdult" = DarkRed, "16 HumanDevelopment"  = LightOrange, "17 HumanDevelopment"  = LightOrange, "12 MouseAdult" = GreenMedDark, "14 HumanDevelopment"  = LightOrange, "18 HumanAdult" = DarkRed, "12 HumanDevelopment"  = LightOrange, "18 HumanDevelopment"  = LightOrange, "12 HumanAdult" = DarkRed, "11 MouseDevelopment" = BlueMedLight, "19 HumanAdult" = DarkRed, "12 MouseDevelopment" = BlueMedLight, "15 HumanDevelopment"  = LightOrange, "11 HumanDevelopment"  = LightOrange, "13 HumanAdult" = DarkRed, "17 HumanAdult" = DarkRed)
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 1, color = ~order2, colors = Fig3Colors)
+htmlwidgets::saveWidget(p, paste("~/Figure3_SpeciesStage.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 1, color = ~SpeciesStage, colors = SpeciesTimeColors)
+htmlwidgets::saveWidget(p, paste("~/Figure3_SpeciesStageSingle.html", sep=""))
+
+########## 3D UMAP HUMAN NUCLEI ############# 
+#############################################
+
+CellAssignments_3D_Human = subset(CellAssignments_3D, CellAssignments_3D$SpeciesStage %in% c("HumanAdult", "HumanDevelopment"))
+
+ExtrapolatedAssigns = read.csv("ExtrapolatedAssigns.csv", row.names = 1)
+
+PullK116Nuclei_2 = subset(ExtrapolatedAssigns, ! ExtrapolatedAssigns$K116NucleiFetalAssign %in% "Unassigned")
+CellAssignments_3D_Human = merge(CellAssignments_3D_Human, PullK116Nuclei_2, by.x = "Barcodes", by.y = 0)
+
+p = plot_ly(CellAssignments_3D_Human, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 1, colors = NucleiColors, color = ~K116NucleiFetalAssign)
+htmlwidgets::saveWidget(p, paste("~/Figure3_HumanNuc.html", sep=""))
+
+
+########## 3D UMAP MOUSE NUCLEI ############# 
+#############################################
+CellAssignments_3D[is.na(CellAssignments_3D$CellAssignments_3D),] = "NA"
+CellAssignments_3D_Mouse = subset(CellAssignments_3D, CellAssignments_3D$SpeciesStage %in% c("MouseAdult", "MouseDevelopment") & CellAssignments_3D$Region_summarized_Clean %in% c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO", "SMN", "MN",  "ZI" ))
+
+p = plot_ly(CellAssignments_3D_Mouse, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 1, colors = NucleiColors, color = ~Region_summarized_Clean)
+htmlwidgets::saveWidget(p, paste("~/Figure3_MouseNuc.html", sep=""))
+```
+
+###############################################
+######### GENERATE 3D UMAPS - SUPP ############
+###############################################
+```{r}
+CellAssignments_3D = merge(HumMouInt@meta.data, Get3D_coords_Fig3, by = 0)
+########### By Species/Stage ############### 
+############################################
+for(x in unique(HumMouInt@meta.data$SpeciesStage)){
+CellAssignments_3D$SampleSplitBinary = ifelse(CellAssignments_3D$SpeciesStage == x, x, "aOther") 
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 1, colors = c(SpeciesTimeColors, "aOther" = "lightgrey"), color = ~SampleSplitBinary)
+htmlwidgets::saveWidget(p, paste("~/Figure3_UMAPfor", x, ".html", sep=""))
+}
+
+
+############### By Nuclei ################## 
+############################################
+CellAssignments_3D_1 = merge(Get3D_coords_Fig3, ExtrapolatedAssigns, by.x = "Barcodes", by.y = 0, all=T)
+CellAssignments_3D_2 = merge(CellAssignments_3D_1, HumMouInt@meta.data, by.x = "Barcodes", by.y = 0)
+for(x in c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO", "SMN", "MN",  "ZI" )){
+PlottedData = subset(CellAssignments_3D_2, CellAssignments_3D_2$Region_summarized_Clean %in% x | CellAssignments_3D_2$K116NucleiFetalAssign %in% x)
+
+CellAssignments_3D_2$NucleiComparison = ifelse(CellAssignments_3D_2$Barcodes %in% PlottedData$Barcodes, CellAssignments_3D_2$SpeciesStage, "zOther") 
+
+p = plot_ly(CellAssignments_3D_2, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 1, color = ~NucleiComparison, colors = c(SpeciesTimeColors, "zOther" = "lightgrey"))
+htmlwidgets::saveWidget(p, paste("~/Figure3_UMAPfor", x, ".html", sep=""))  
+}
+
+
+########## By Neurotransmitter ############# 
+############################################
+DefaultAssay(HumMouInt) = "RNA"
+
+PullMeta = FetchData(HumMouInt, vars = c("SLC32A1", "SLC17A6", "HDC"), slot = "counts")
+
+PullMeta$RecodeSLC32A1 = ifelse(PullMeta$SLC32A1 > 0,  "Pos", "Neg")
+PullMeta$RecodeHDC1 = ifelse(PullMeta$HDC > 10,  "Pos", "Neg")
+PullMeta$RecodeSLC17A6 = ifelse(PullMeta$SLC17A6 > 3,  "Pos", "Neg")
+PullMeta$LogSLC32A1 = log10(PullMeta$SLC32A1+1)
+
+CheckOverlap = subset(PullMeta, PullMeta$RecodeSLC32A1 == "Pos" & PullMeta$RecodeSLC17A6  == "Pos")
+CheckOverlap = subset(PullMeta, PullMeta$RecodeSLC32A1 == "Pos" & PullMeta$RecodeHDC1  == "Pos")
+CheckOverlap = subset(PullMeta, PullMeta$RecodeHDC1 == "Pos" & PullMeta$RecodeSLC17A6  == "Pos")
+  
+  
+CellAssignments_3D = merge(PullMeta, Get3D_coords_Fig3, by = 0)
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~RecodeSLC32A1, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste("~/Figure3_FeaturePlot_RecodeSLC32A1.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,sizes = 1,  size = 1, color = ~RecodeHDC1, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste("~/Figure3_FeaturePlot_RecodeHDC1.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~RecodeSLC17A6, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste("~/Figure3_FeaturePlot_RecodeSLC17A6.html", sep=""))
+
+############### By Dataset ################# 
+############################################
+CellAssignments_3D = merge(Get3D_coords_Fig3, HumMouInt@meta.data, by = 0)
+
+CellAssignments_3D$DatasetClean = factor(CellAssignments_3D$DatasetClean, levels = c("Kim [Mouse Development]", "Romanov [Mouse Development]", "Affinati [Mouse Adult VMH]", "Campbell [Mouse Adult ARC]",  "Chen [Mouse Adult]",  "Kim [Mouse Adult VMH]",  "Lee [Mouse Adult]",    "Liu  [Mouse Adult VMH]","Rossi [Mouse Adult LH",  "Mickelsen [Mouse Adult LH]", "Mickelsen [Mouse Adult VPH]","Moffit [Mouse Adult PO]", "Morris [Mouse Adult SCN]", "Rupp [Mouse Adult Lepr+]", "Wen [Mouse Adult SCN]", "Zeisel [Mouse Adult]", "Herb [Human Fetal]",  "Zhou [Human Fetal]",  "Siletti [Human Adult]"))
+ 
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~DatasetClean, colors = Fig3_SeuColors)
+htmlwidgets::saveWidget(p, paste("~/Figure3_ByDataset.html", sep=""))
+```
+
+###############################################
+############# SUPPLEMENTAL TABLES #############
+###############################################
+```{r}
+HumMouInt@meta.data$count = 1
+SupTableFig3 = HumMouInt@meta.data %>% group_by(DatasetClean) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableFig3, "SupTableFig3_Adult.csv", row.names=F)
+
+Idents(HumMouInt) = "DatasetClean"
+MouseDev = subset(HumMouInt, idents = c("Romanov [Mouse Development]"))
+SupTableFig3 = MouseDev@meta.data %>% group_by(DatasetClean, Age) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableFig3, "SupTableFig3_Romanov.csv", row.names=F)
+
+Idents(HumMouInt) = "DatasetClean"
+MouseDev = subset(HumMouInt, idents = c("Kim [Mouse Development]"))
+SupTableFig3 = MouseDev@meta.data %>% group_by(DatasetClean, orig.ident) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableFig3, "SupTableFig3_Kim.csv", row.names=F)
+```
+
+###############################################
+########### METANEIGHOR COMPARISONS ###########
+###############################################
+```{r}
+### Calc % of HypoMap clust from each Dataset ##
+################################################
+Idents(HumMouInt) = "SpeciesStage"
+MouseAdultSeu = subset(HumMouInt, idents = "MouseAdult")
+
+PercentDataset = as.data.frame(table(MouseAdultSeu@meta.data$DatasetClean))
+C185_ByDataset = as.data.frame(matrix(ncol=4, nrow=0))
+for(x in sort(unique(MouseAdultSeu@meta.data$C185_named))){
+PullClusters = subset(MouseAdultSeu@meta.data, MouseAdultSeu@meta.data$C185_named == x)
+ClusterTab = as.data.frame(table(PullClusters$DatasetClean))
+ClusterTab = merge(ClusterTab, PercentDataset, by = "Var1")
+ClusterTab$Pct = ClusterTab$Freq.x/ClusterTab$Freq.y
+ClusterTab = ClusterTab[order(-ClusterTab$Pct), ]
+
+HM_Nuc = as.data.frame(table(PullClusters$Region_summarized_Clean))
+HM_Nuc = HM_Nuc[order(-HM_Nuc$Freq), ]
+  
+Data = as.data.frame(t(c(x, paste(paste(ClusterTab$Var1, " [", round(ClusterTab$Pct/sum(ClusterTab$Pct)*100, digits = 2), "%]", sep=""), collapse = "; "), paste(paste(HM_Nuc$Var1, " [", round(HM_Nuc$Freq/sum(HM_Nuc$Freq)*100, digits = 2), "%]", sep=""), collapse = "; "),  as.character(HM_Nuc[[1]][[1]]))))
+C185_ByDataset = rbind(C185_ByDataset, Data)  
+}
+
+
+
+######## COMPILE ANNOTS WITH METANEIGHBOR #########
+###################################################
+
+MN_TopHits = readRDS("~/MN_July_2023_top_hits_NV_humanK116_mouseC185.rds") #MetaNeighbor run by Brian
+MN_TopHits$HypoMap = ifelse(grepl(MN_TopHits$`Study_ID|Celltype_1`, pattern = "hypo"), MN_TopHits$`Study_ID|Celltype_1`, MN_TopHits$`Study_ID|Celltype_2`)
+MN_TopHits$HS = ifelse(grepl(MN_TopHits$`Study_ID|Celltype_1`, pattern = "HS"), MN_TopHits$`Study_ID|Celltype_1`, MN_TopHits$`Study_ID|Celltype_2`)
+MN_TopHits$HypoMap = gsub("hypoMap\\|", "", MN_TopHits$HypoMap)
+MN_TopHits$HS = gsub("HSatlas\\|", "", MN_TopHits$HS)
+MN_ByDataset = merge(C185_ByDataset, MN_TopHits, by.x = "V1", by.y = "HypoMap")
+
+Adult_Annots = read.csv("~/AllHumanAnnots_ByCell_12JUL23.csv")
+
+K116Annots = Adult_Annots %>% dplyr::select("K116", "K_116Nuclei", "K116_Class")
+K116Annots$K116_match = paste("K116_", K116Annots$K116, sep="")
+K116Annots$Dups = duplicated(K116Annots$K116)
+K116Annots = subset(K116Annots, K116Annots$Dups == F); K116Annots$Dups = NULL
+MN_ByDataset2 = merge(K116Annots, MN_ByDataset, by.x = "K116_match", by.y = "HS")
+MN_ByDataset3 = MN_ByDataset2 %>% group_by(K116) %>% slice_max(order_by = Mean_AUROC, n = 1)
+MN_ByDataset3$Dups = duplicated(MN_ByDataset3$K116_match) |  duplicated(MN_ByDataset3$K116_match, fromLast=T)
+MN_ByDataset3$Rm = ifelse(MN_ByDataset3$Dups == T & MN_ByDataset3$Match_type == "Above_0.8", "Rm", "Keep")
+MN_ByDataset4 = subset(MN_ByDataset3, MN_ByDataset3$Rm == "Keep")
+
+MN_ByDataset4$Match = MN_ByDataset4$V4 == MN_ByDataset4$K_116Nuclei
+MN_ByDataset5 = subset(MN_ByDataset4, ! MN_ByDataset4$K_116Nuclei == "Unassigned" & ! MN_ByDataset4$V4 == "Unassigned" )
+
+MN_ByDataset_Reduced = MN_ByDataset4 %>% dplyr::select("K116", "V1", "Match_type", "Mean_AUROC",  "V2", "V3", "V4")
+colnames(MN_ByDataset_Reduced) = c("K116", "HypoMap_Cluster", "MN_Match", "MN_Mean_AUROC",  "HypoMap_Datasets", "HypoMapNuclei_Pct" , "HypoMapNuclei")
+
+#write.csv(Compile_K116, "K116_Annotations_8JUL23.csv")
+```
+
+###############################################
+############## METANEIGHOR PLOTS ##############
+###############################################
+```{r}
+#NB: Brian generated Metaneighbor heatmap
+
+############## ALLUVIAL PLOT #################
+##############################################
+##Alluvial_Nuclei = read.csv("~/K116_Annotations_8JUL23.csv") 
+Alluvial_Nuclei$Dups = duplicated(Alluvial_Nuclei$K116)
+Alluvial_Nuclei = subset(Alluvial_Nuclei, ! Alluvial_Nuclei$H108_Nuclei %in% c("Unassigned", "", NA) & ! Alluvial_Nuclei$HypoMapNuclei %in% c("Unassigned", "", NA) & Alluvial_Nuclei$Dups == F)
+Alluvial_Nuclei$HypoMapNuclei = gsub("PVHpo", "PVH", gsub("AH", "PO",  Alluvial_Nuclei$HypoMapNuclei))
+
+  
+Alluvial_Nuclei = Alluvial_Nuclei %>% dplyr::select("HypoMapNuclei", "H108_Nuclei", "HumanMouseMatch")
+Alluvial_Nuclei$x = 1
+FreqAssigns = Alluvial_Nuclei %>% group_by(HypoMapNuclei, H108_Nuclei) %>% dplyr::summarise(Freq = sum(x))
+#FreqAssigns = gsub("", "Unassigned", FreqAssigns)
+#FreqAssigns[is.na(FreqAssigns)] = "Unassigned" 
+FreqAssigns$H108_Nuclei = factor(FreqAssigns$H108_Nuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned"))
+
+Alluvial =ggplot(data = FreqAssigns,
+       aes(axis1 = H108_Nuclei,   # First variable on the X-axis
+           axis2 = HypoMapNuclei, # Second variable on the X-axis
+           y = Freq)) +
+  geom_alluvium(aes(fill = H108_Nuclei)) +
+  geom_stratum( color = "grey") +
+  geom_text(stat = "stratum", size = 1.5, face = "bold",
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("H108_Nuclei", "H108_Nuclei"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+NoLegend()+ scale_fill_manual(values = NucleiColors)
+
+pdf(paste("Fig3_HypoMapComparison.pdf", sep=""), width = 2, height = 5)
+print(Alluvial)
+dev.off()
+
+
+
+
+############# MATCHING REGIONS ###############
+##############################################
+Alluvial_Nuclei$HumanMouse = ifelse(Alluvial_Nuclei$H108_Nuclei == Alluvial_Nuclei$HypoMapNuclei, "NucleiMatched", "NotMatched")
+Alluvial_Nuclei$AdjacentRegions = paste(Alluvial_Nuclei$H108_Nuclei, "_", Alluvial_Nuclei$HypoMapNuclei, sep="")
+
+Alluvial_Nuclei$AdjacentRegions <- ifelse(Alluvial_Nuclei$H108_Nuclei > Alluvial_Nuclei$HypoMapNuclei, paste(Alluvial_Nuclei$HypoMapNuclei, Alluvial_Nuclei$H108_Nuclei, sep = " - "),   paste(Alluvial_Nuclei$H108_Nuclei, Alluvial_Nuclei$HypoMapNuclei, sep = " - "))
+
+Alluvial_Nuclei$HumanMouse = ifelse(Alluvial_Nuclei$HumanMouse ==  "NotMatched" & Alluvial_Nuclei$AdjacentRegions %in% c("LH - ZI", "MN - SMN",  "MN - TM", "ARC - VMH", "DMH - VMH", "LH - SMN", "LH - PO"), "AdjacentRegion", Alluvial_Nuclei$HumanMouse) 
+
+Alluvial_Nuclei$H108_Nuclei = factor(Alluvial_Nuclei$H108_Nuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned"))
+Alluvial_Nuclei$HypoMapNuclei = factor(Alluvial_Nuclei$HypoMapNuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned")) 
+
+Alluvial_Nuclei = Alluvial_Nuclei[order(Alluvial_Nuclei$H108_Nuclei, Alluvial_Nuclei$HypoMapNuclei), ]
+Alluvial_Nuclei$Order = seq(1, dim(Alluvial_Nuclei)[1], 1)  
+  
+Matching = ggplot(Alluvial_Nuclei, aes(x = x, y = Order, fill = HumanMouseMatch)) +
+  geom_tile(color = "white") + scale_fill_manual(values = c("NotMatched" = "#d64151", "AdjacentRegion" = "#386fa4", "NucleiMatched" = "#aad576")) + theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.title.x = element_blank(),  axis.text.x = element_blank(),  axis.text.y = element_blank(), legend.position = "none")+scale_x_discrete(expand=c(0, 0))+  scale_y_discrete(expand=c(0, 0))
+
+pdf(paste("Fig3_HypoMapComparisonMatched.pdf", sep=""), width = 0.4, height = 4.7)
+print(Matching)
+dev.off()
+```
+
+###############################################
+############# PAIRED TF ANALYSIS ##############
+###############################################
+```{r}
+#Rescale data just using genes common to all datasets
+CommonGenes = read.csv("~/CommonGenes_Fig3.csv", row.names=1)
+DefaultAssay(HumMouInt) = "RNA"
+HumMouInt <- subset(HumMouInt,features=CommonGenes$CommonGenes)
+HumMouInt = ScaleData(HumMouInt, vars.to.regress = "nCount_RNA")
+saveRDS(HumMouInt, "HumanScaled.rds")
+
+MRTreeRes = readRDS("~/tree80_L15_treeTrim.rds")
+Resolutions = as.data.frame(MRTreeRes)
+Resolutions$K560 = gsub(558, 11, gsub(554, 544, gsub(551, 348,  Resolutions$K560)))
+Resolutions$K494 = gsub(508, 29,  Resolutions$K494)
+Resolutions$Barcodes = row.names(Resolutions)
+
+for(x in colnames(Resolutions)){
+  PullMeta = Resolutions %>% dplyr::select(x)  
+  HumMouInt = AddMetaData(HumMouInt, PullMeta, x)  
+}
+
+
+################# RUN DEGS ###################
+##############################################
+TFs = read.csv("HumanTFs.csv")
+TFs_In = subset(TFs, TFs$Gene %in% row.names(HumMouInt@assays$RNA@data))
+
+#Run DEGs
+Idents(HumMouInt) = "SpeciesStage"
+MouseAd = subset(HumMouInt, idents = c("MouseAdult"))
+DefaultAssay(MouseAd) = "RNA"
+Idents(MouseAd) = "C185_named"
+DEGs = FindAllMarkers(MouseAd, only.pos = T, logfc.threshold = 0.5, features = TFs_In$Gene) 
+write.csv(DEGs, "AllTFDEGS_MouseAd.csv")
+
+Idents(HumMouInt) = "SpeciesStage"
+HumanAd = subset(HumMouInt, idents = c("HumanAdult"))
+DefaultAssay(HumanAd) = "RNA"
+Idents(HumanAd) = "K116"
+DEGs = FindAllMarkers(HumanAd, only.pos = T, logfc.threshold = 0.5, features = TFs_In$Gene) 
+write.csv(DEGs, "AllTFDEGS_HumanAd.csv")
+
+
+AllTFDEGS_HumanAd = read.csv("~/AllTFDEGS_HumanAd.csv", row.names = 1)
+AllTFDEGS_MouseAd = read.csv("~/AllTFDEGS_MouseAd.csv", row.names = 1)
+AllTFDEGS_HumanAd = subset(AllTFDEGS_HumanAd, AllTFDEGS_HumanAd$p_val_adj < 0.05)
+AllTFDEGS_MouseAd = subset(AllTFDEGS_MouseAd, AllTFDEGS_MouseAd$p_val_adj < 0.05)
+
+
+############### COMPARE DEGS #################
+##############################################
+HumanMouseDEGComp = as.data.frame(matrix(ncol = 15, nrow = 0))
+colnames(HumanMouseDEGComp) = c("HUMAN_gene", "HUMAN_p_val", "HUMAN_avg_log2FC", "HUMAN_pct.1" , "HUMAN_pct.2", "HUMAN_p_val_adj",  "HUMAN_cluster", "Conserved", "MOUSE_p_val", "MOUSE_avg_log2FC", "MOUSE_pct.1", "MOUSE_pct.2", "MOUSE_p_val_adj", "MOUSE_cluster", "Comparison")
+
+for(x in MN_ByDataset_Reduced$K116){
+PullComp = subset(MatchedAnnotations, MatchedAnnotations$K116 ==x)  
+SubsHuman = subset(AllTFDEGS_HumanAd, AllTFDEGS_HumanAd$cluster %in% PullComp$K116)
+Rename = gsub("K_", "H108-", PullComp$H108_Cluster)
+SubsMouse = subset(AllTFDEGS_MouseAd, AllTFDEGS_MouseAd$cluster %in% PullComp$HypoMap_Cluster)
+colnames(SubsHuman) = paste("HUMAN", colnames(SubsHuman), sep="_")
+colnames(SubsMouse) = paste("MOUSE", colnames(SubsMouse), sep="_")
+SubsHuman$Conserved = ifelse(SubsHuman$HUMAN_gene %in% SubsMouse$MOUSE_gene, "Conserved", "HumanOnly")
+
+MergedConserved = merge(SubsHuman, SubsMouse, by.x  = "HUMAN_gene", by.y = "MOUSE_gene", all =T)
+MergedConserved$Conserved[is.na(MergedConserved$Conserved)] = "MouseOnly"
+MergedConserved$Comparison = paste(Rename, "[Human] v", PullComp$HypoMap_Cluster, "[Mouse]")
+HumanMouseDEGComp = rbind(HumanMouseDEGComp, MergedConserved)
+}
+HumanMouseDEGComp[is.na(HumanMouseDEGComp)] ="-"
+HumanMouseDEGComp$Added_FC = HumanMouseDEGComp$HUMAN_avg_log2FC+HumanMouseDEGComp$MOUSE_avg_log2FC
+HumanMouseDEGComp = HumanMouseDEGComp[order(HumanMouseDEGComp$Comparison, HumanMouseDEGComp$Conserved, -HumanMouseDEGComp$Added_FC), ]
+
+write.csv(HumanMouseDEGComp, "HumanMouseDEGComp.csv")
+
+
+######### DOTPLOTS OF KEY POPS DEGS ###########
+##############################################
+HumanMouseDEGComp_POMC = subset(HumanMouseDEGComp, HumanMouseDEGComp$Comparison == "H108-57 [Human] v C185-50 [Mouse]")
+HumanMouseDEGComp_AVP = subset(HumanMouseDEGComp, HumanMouseDEGComp$Comparison == "H108-107 [Human] v C185-53 [Mouse]")
+HumanMouseDEGComp_KISS1_1 = subset(HumanMouseDEGComp, HumanMouseDEGComp$Comparison == "H108-22 [Human] v C185-51 [Mouse]")
+
+PullPOMC = subset(HumMouInt@meta.data, HumMouInt@meta.data$C185_named == "C185-50: Ttr.Pomc.GLU-5" | HumMouInt@meta.data$K116 == 57)
+POMCCells = subset(HumMouInt, cells = row.names(PullPOMC))
+pdf("POMCCells_Specificity.pdf", width = 4, height = 2)
+print(DotPlot(POMCCells, features = c("TBX3", "ZBTB20", "ESR1", "ISL1", "PGR", "PBX3", "ZFHX4", "THRB",  "PLAGL1", "TAF1C", "CITED1", "RBBP7"),  assay = "RNA", scale = F, col.max = 3,  dot.min = 0.1, cols = c("lightgrey","#386fa4"))+theme(axis.text.x = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5, face = "italic"), axis.text.y = element_text(size = 4), axis.title = element_blank())+NoLegend()+ scale_size(breaks = c(0, 20, 40, 60, 80, 101))) 
+dev.off()
+
+PullAVP = subset(HumMouInt@meta.data, HumMouInt@meta.data$C185_named == "C185-53: Ebf3.Caprin2.GLU-6" | HumMouInt@meta.data$K116 == 107)
+AVPCells = subset(HumMouInt, cells = row.names(PullAVP))
+pdf("AVPCells_Specificity.pdf", width = 4, height = 2)
+print(DotPlot(AVPCells, features = c("POU3F2", "OTP", "SIM1", "EBF3",  "NR3C1", "FOS", "NFIB", "TCF4",  "ZNF804B", "ZNF804A", "MAML3", "FOXP2"),  assay = "RNA", scale = F, col.min=0, col.max = 3,  dot.min = 0.1, cols = c("lightgrey","#386fa4"))+theme(axis.text.x = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5, face = "italic"), axis.text.y = element_text(size = 4), axis.title = element_blank())+NoLegend()+ scale_size(breaks = c(0, 20, 40, 60, 80, 101))) 
+
+PullKISS1 = subset(HumMouInt@meta.data, HumMouInt@meta.data$C185_named == "C185-51: Tac2.GLU-5" | HumMouInt@meta.data$K116 == 81)
+KISS1Cells = subset(HumMouInt, cells = row.names(PullKISS1))
+pdf("KISS1Cells_Specificity.pdf", width = 4, height = 2)
+print(DotPlot(KISS1Cells, features = c("ESR1", "AR", "PGR", "TBX3", "L3MBTL4", "PREX2", "SOX5", "TCF4",  "NHLH2", "NR5A2", "NR4A2", "LHX5"),  assay = "RNA", scale = F, col.min=0, col.max = 3,  dot.min = 0.1, cols = c("lightgrey","#386fa4"))+theme(axis.text.x = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5, face = "italic"), axis.text.y = element_text(size = 4), axis.title = element_blank())+NoLegend()+ scale_size(breaks = c(0, 20, 40, 60, 80, 101))) 
+dev.off()
+```

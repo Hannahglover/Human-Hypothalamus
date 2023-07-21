@@ -1,0 +1,803 @@
+---
+title: "FIGURE 2 ANALYSIS"
+output: html_notebook
+---
+
+NOTES:
+- Cluster category names in the paper are different from  what appears in the final paper, cluster category names are labeled in the paper according to the number of cells in the category (ie H108), rather that the original clustering (ie. K116)
+- Brian generated the circular dendrograms and the pseduotime plots in Fig 2H based on these annotations
+
+
+###############################################
+#################### SETUP ####################
+###############################################
+
+#Import packages
+```{r}
+library(tidyverse)
+library(igraph)
+library(monocle3)
+library(Seurat)
+library(plotly)
+library(ggalluvial)
+```
+
+#Colors
+```{r}
+LightPink =   "#ffc2d4"
+MedPink =     "#ff9ebb"
+DarkPink =    "#ff7aa2"
+DarkRed =     "#9e1b44"
+LightRed =    "#d64050"
+DarkOrange =  "#f36c44"
+LightOrange = "#faad60"
+Mustard =     "#fecf29"
+LightYellow = "#fee08b"
+GreenLighest ="#aad576"
+GreenMedLight="#78a02d"
+GreenMedDark ="#538d22"
+GreenDark =   "#245501"
+BlueDark =    "#133c55"
+BlueMedDark = "#386fa4"
+BlueMedLight ="#59a5d8"
+BlueLighest = "#84d2f6"
+LightPurple = "#b185db"
+DarkPurple =  "#7251b5"
+Grey =        "#666666"
+HeatmapBlue = BlueMedDark
+
+TimepointColors_Fetal = c("GW10" = LightPink, "GW12" = DarkPink, "GW15" = DarkRed, "GW16" = DarkOrange, "GW18" = LightOrange, "GW19" = Mustard, "GW20" = GreenLighest, "GW22" = GreenMedDark, "GW25" = BlueMedDark, "29" = BlueLighest, "42" = LightPurple, "50" = DarkPurple) #12
+
+NucleiColors = c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed,  "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark,   "SMN" =BlueMedLight, "MN"= BlueLighest, "ZI" = LightPurple,  "Unassigned" = "darkgrey", "Fetal" = "lightgrey")
+
+ClassColors = c("Glutaminergic" = "#d64151", "GABAergic" = "#386fa4","Histaminergic" = "#aad576", "Unknown" =  "darkgrey", "Fetal" =  "lightgrey")
+
+SpeciesTimeColors = c("HumanAdult" = DarkRed,  "HumanDevelopment"= LightOrange, "MouseAdult"= GreenMedDark, "MouseDevelopment"  = BlueMedLight)
+```
+
+#Read in data and organize metadata
+```{r}
+EdKaZhouHypoNeurons = readRDS("~/EdKaZhouHypoNeurons_mt10_integrated.rds")
+#Brian ran integration and mrTree clustering
+
+##### CLEAN UP METADATA ##### 
+EdKaZhouHypoNeurons@meta.data$SampleBroad = gsub("_.*", "", gsub("22T", "22", gsub("CS22", "GW10", EdKaZhouHypoNeurons@meta.data$sample)))
+EdKaZhouHypoNeurons@meta.data$SampleBroad = ifelse(EdKaZhouHypoNeurons@meta.data$SampleBroad %in% c("10X190", "10X192", "10X193", "10X203", "10X360", "10X362", "10X376", "10X380", "10X389", "10X392"), EdKaZhouHypoNeurons@meta.data$Roi, EdKaZhouHypoNeurons@meta.data$SampleBroad)
+EdKaZhouHypoNeurons@meta.data$SampleBroad = gsub("\\<Human HTHma\\>", "Adult_MN", gsub("\\<Human HTHma-HTHtub\\>", "Adult_TUB/MN", gsub("\\<Human HTHpo\\>", "Adult_PO", gsub("\\<Human HTHpo-HTHso\\>", "Adult_PO/SO", gsub("\\<Human HTHso\\>", "Adult_SO", gsub("\\<Human HTHso-HTHtub\\>", "Adult_SO/TUB", gsub("\\<Human HTHtub\\>", "Adult_TUB", gsub("\\<Human MN\\>", "Adult_MN", EdKaZhouHypoNeurons@meta.data$SampleBroad))))))))
+EdKaZhouHypoNeurons@meta.data$SampleAdult = gsub("_.*", "", EdKaZhouHypoNeurons@meta.data$SampleBroad)
+Timepoints = EdKaZhouHypoNeurons@meta.data %>% dplyr::select(SampleBroad)
+
+EdKaZhouHypoNeurons@meta.data$SampleDissect = ifelse(is.na(EdKaZhouHypoNeurons@meta.data$Age) == T, EdKaZhouHypoNeurons@meta.data$SampleBroad, paste(EdKaZhouHypoNeurons@meta.data$Age,"YO_", EdKaZhouHypoNeurons@meta.data$SampleBroad, sep=""))
+EdKaZhouHypoNeurons$TimepointAll = ifelse(EdKaZhouHypoNeurons$Age %in% c(29,42,50), paste("Adult_", EdKaZhouHypoNeurons$Age, "YO", sep=""), EdKaZhouHypoNeurons$SampleAdult)
+EdKaZhouHypoNeurons@meta.data$FetalAdult = ifelse(EdKaZhouHypoNeurons@meta.data$SampleAdult == "Adult", "Adult", "Fetal")
+
+MRTreeRes = readRDS("~/tree80_L15_treeTrim.rds") 
+Resolutions = as.data.frame(MRTreeRes)
+Resolutions$K560 = gsub(558, 11, gsub(554, 544, gsub(551, 348,  Resolutions$K560)))
+Resolutions$K494 = gsub(508, 29,  Resolutions$K494)
+Resolutions$Barcodes = row.names(Resolutions)
+
+for(x in colnames(Resolutions)){
+  PullMeta = Resolutions %>% dplyr::select(x)  
+  EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, PullMeta, x)  
+}
+```
+
+
+###############################################
+############ PLOTS FOR ANNOTATIONS ############
+###############################################
+
+```{r}
+#Prep for cluster annotations - Dotplots for main genes and tables of dissect
+
+########## Plot Marker genes at several resolutions ###########
+###############################################################
+HumanAdultSeu = subset(EdKaZhouHypoNeurons, cells = row.names(Resolutions))
+
+GeneList = unique(c("ARHGAP6", "PTHLH", "CALCR", "LEF1", "GPR50", "EBF2", "EBF1", "GPR50", "PIEZO2", "RFX4", "PVALB1", "UCN3",  "NTS",  "SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1",  "SLC17A6", "SLC17A8", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SIM1", "POU3F2",  "NHLH2", "MC4R", "OXT", "AVP", "CRH", "GAL", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "PITX2", "FOXP1", "FOXP2", "FOXB1", "SOX14",  "FEZF2", "LHX1", "HCRT", "CARTPT", "PMCH", "LHX2", "LHX9", "PDYN", "RGS16","LHX1", "GRP", "VIP", "CCK", "VAX1", "SIX3", "SIX6" , "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5", "PPP1R17", "NKX2-2", "LHX8", "NR2F1", "NR2F2", "HMX3", "RELN", "MEIS2", "ARX", "LHX6", "PRDM8", "SLC17A7", "NFIX", "SOX6", "ATP1A1", "RGS8", "NHLH1", "ESR1", "PGR", "FOXO1", "NOS1", "RXFP1", "TAC3", "TAC1", "GNRH1", "NPVF", "ESR2", "NDN", "PER1", "PER2", "PER3", "CRY1", "CRY2", "DBP", "HTR2C", "OPRD1", "OXTR", "NMU"))
+HumanAdultSeu@meta.data$K116 = factor(HumanAdultSeu$K116, levels = sort(unique(HumanAdultSeu$K116)))
+Idents(HumanAdultSeu) = "K116"
+
+Idents(HumanAdultSeu) = "K6"
+DefaultAssay(HumanAdultSeu) = "RNA"
+pdf("K6_DotPlot_MainGenes.pdf", width = 10, height = 15)
+print(DotPlot(HumanAdultSeu, features =  GeneList, assay = "RNA", cluster.idents = T, col.min=0)+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+coord_flip())
+dev.off()
+
+Idents(HumanAdultSeu) = "K55"
+DefaultAssay(HumanAdultSeu) = "RNA"
+pdf("K55_DotPlot_MainGenes.pdf", width = 15, height = 15)
+print(DotPlot(HumanAdultSeu, features = GeneList, assay = "RNA", cluster.idents = T, col.min=0)+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+coord_flip())
+dev.off()
+
+pdf("K116_DotPlot_MainGenes.pdf", width = 20, height = 20)
+print(DotPlot(HumanAdultSeu, features = GeneList, assay = "RNA", cluster.idents = T, col.min=0)+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+coord_flip())
+dev.off()
+
+Idents(HumanAdultSeu) = "K560"
+DefaultAssay(HumanAdultSeu) = "RNA"
+pdf("K560_DotPlot_MainGenes.pdf", width = 40, height = 15)
+print(DotPlot(HumanAdultSeu, features = GeneList, assay = "RNA", cluster.idents = T, col.min=0)+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+coord_flip())
+dev.off()
+
+
+##### Generate Percentages/Dissection #####
+###########################################
+HumanAdultSeu@meta.data$SampleBroad = gsub("\\<Human HTHma\\>", "Adult_MN", gsub("\\<Human HTHma-HTHtub\\>", "Adult_TUB/MN", gsub("\\<Human HTHpo\\>", "Adult_PO", gsub("\\<Human HTHpo-HTHso\\>", "Adult_PO/SO", gsub("\\<Human HTHso\\>", "Adult_SO", gsub("\\<Human HTHso-HTHtub\\>", "Adult_SO/TUB", gsub("\\<Human HTHtub\\>", "Adult_TUB", gsub("\\<Human MN\\>", "Adult_MN", HumanAdultSeu@meta.data$Roi))))))))
+
+PercentDissection = as.data.frame(table(HumanAdultSeu@meta.data$SampleBroad))
+K116_ByDissection = as.data.frame(matrix(ncol=2, nrow=0))
+
+for(x in unique(HumanAdultSeu@meta.data$K116)){
+PullClusters = subset(HumanAdultSeu@meta.data, HumanAdultSeu@meta.data$K116 == x)
+ClusterTab = as.data.frame(table(PullClusters$SampleBroad))
+ClusterTab = merge(ClusterTab, PercentDissection, by = "Var1")
+ClusterTab$Pct = ClusterTab$Freq.x/ClusterTab$Freq.y
+ClusterTab = ClusterTab[order(-ClusterTab$Pct), ]
+Data = as.data.frame(t(c(x, paste(paste(ClusterTab$Var1, " [", round(ClusterTab$Pct/sum(ClusterTab$Pct)*100, digits = 2), "%]", sep=""), collapse = "; "))))
+K116_ByDissection = rbind(K116_ByDissection, Data)  
+}
+```
+
+
+###############################################
+################## 3D UMAPS ##################
+###############################################
+```{r}
+#Plotting 3D UMAPS (Sample + Neurotransmitters)
+
+DefaultAssay(EdKaZhouHypoNeurons) = "integrated"
+EdKaZhouHypoNeurons = RunUMAP(EdKaZhouHypoNeurons, n.components = 3, reduction = "pca", dims = 1:30)
+
+Get3D_coords = as.data.frame(EdKaZhouHypoNeurons@reductions$umap@cell.embeddings)
+
+## UMAP by Sample
+EdKaZhouHypoNeurons@meta.data$SampleTime = ifelse(EdKaZhouHypoNeurons@meta.data$SampleAdult == "Adult", EdKaZhouHypoNeurons@meta.data$Age, EdKaZhouHypoNeurons@meta.data$SampleAdult)
+PullMeta = EdKaZhouHypoNeurons@meta.data%>% dplyr::select(SampleTime)
+
+CellAssignments_3D = merge(PullMeta, Get3D_coords, by = 0)
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 2, color = ~SampleTime, colors = TimepointColors_Fetal)
+htmlwidgets::saveWidget(p, paste("~/Figure2_Samples.html", sep=""))
+
+##########################################################################
+####################### Generate 3D FEATURE PLOTS ######################## 
+##########################################################################
+DefaultAssay(EdKaZhouHypoNeurons) = "RNA"
+
+PullMeta = FetchData(EdKaZhouHypoNeurons, vars = c("SLC32A1", "SLC17A6", "HDC"), slot = "counts")
+
+PullMeta$RecodeSLC32A1 = ifelse(PullMeta$SLC32A1 > 0,  "Pos", "Neg")
+PullMeta$RecodeHDC1 = ifelse(PullMeta$HDC > 10,  "Pos", "Neg")
+PullMeta$RecodeSLC17A6 = ifelse(PullMeta$SLC17A6 > 3,  "Pos", "Neg")
+
+CheckOverlap = subset(PullMeta, PullMeta$RecodeSLC32A1 == "Pos" & PullMeta$RecodeSLC17A6  == "Pos")
+CheckOverlap = subset(PullMeta, PullMeta$RecodeSLC32A1 == "Pos" & PullMeta$RecodeHDC1  == "Pos")
+CheckOverlap = subset(PullMeta, PullMeta$RecodeHDC1 == "Pos" & PullMeta$RecodeSLC17A6  == "Pos")
+  
+  
+CellAssignments_3D = merge(PullMeta, Get3D_coords, by = 0)
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~RecodeSLC32A1, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste("~/Figure2_FeaturePlot_RecodeSLC32A1.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,sizes = 1,  size = 1, color = ~RecodeHDC1, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste("~/Figure2_FeaturePlot_RecodeHDC1.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~RecodeSLC17A6, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste("~/Figure2_FeaturePlot_RecodeSLC17A6.html", sep=""))
+```
+
+
+###############################################
+#### READ IN ANNOTATIONS TO GENERATE PLOTS ####
+###############################################
+```{r}
+#Annotations compiled in .csv file
+for(x in colnames(Resolutions)){
+  PullMeta = Resolutions %>% dplyr::select(x)  
+  EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, PullMeta, x)  
+}
+
+Adult_Annots = read.csv("~/AllHumanAnnots_ByCell.csv")
+IterativeAnalysis = merge(Adult_Annots, Resolutions, by = "K560")
+
+PullK116Nuclei = IterativeAnalysis %>% dplyr::select("K_116Nuclei")
+row.names(PullK116Nuclei) = IterativeAnalysis$Barcodes
+PullK116Class = IterativeAnalysis %>% dplyr::select("K116_Class")
+row.names(PullK116Class) = IterativeAnalysis$Barcodes
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, PullK116Nuclei, "K116Nuclei")
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, PullK116Class, "K116Class")
+```
+
+
+###############################################
+########### SCCOCO OVERLAY WITH H53 ###########
+###############################################
+```{r}
+####### Generate H53 Heatmap #########
+######################################
+HumanAdultSeu@meta.data$K55 = factor(HumanAdultSeu@meta.data$K55, level = rev(c(sort(unique(HumanAdultSeu@meta.data$K55)))))
+Idents(HumanAdultSeu) = "K55"
+
+Genes = c("HDC", "TBX3",  "LEPR","ISL1","LEF1","POMC","HMX2","GSX1",  "GHRH", "AGRP", "KISS1", "GAL","GHSR","PGR", "ESR1", "SIM1", "POU3F2", "NHLH2","PRDM8", "OTP","PCSK1","TRH","TH","OXT", "SST", "AVP","CRH","GLP1R", "MC4R", "NPY",  "CARTPT","FEZF1","NPTX2","NR5A1","SOX14", "GABRA5","PPP1R17", "GPR50", "GRP","LHX8","CCK", "LHX9", "RFX4", "PDYN","HCRT", "LHX2", "TAC1", "PMCH", "SIX3", "SIX6","RGS16", "VAX1", "RELN","VIP", "NR2F1", "NR2F2", "LHX6", "ARX","NFIX", "SOX6", "BARHL1","LMX1A",   "FOXA1","IRX3", "IRX5",  "EBF1", "EBF2", "LHX1","PITX2", "FOXB1",  "FOXP2","BDNF",  "MEIS2")
+
+DefaultAssay(HumanAdultSeu) = "RNA"
+
+pdf("DotPlot_K55.pdf", width = 14, height = 15)
+print(DotPlot(HumanAdultSeu, features = Genes, assay = "RNA", col.min=0, dot.min = 0.1, cols = c("lightgrey",BlueMedDark)) +theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, face = "italic"))) 
+dev.off()
+
+
+####### Reduce ABA regions to comparable granularity #########
+##############################################################
+scCoco_K55_All = readRDS("~/scCoco_K55.rds") 
+
+scCocoScores = scCoco_K55_All$scores_per_leaf_region_all
+scCocoScores$Names_Reduced = gsub("Tuberomammillary nucleus, ventral part","TM", gsub("Ventral premammillary nucleus","MN", gsub("Median eminence","Unknown", gsub("Paraventricular hypothalamic nucleus, parvicellular division, periventricular part","PVH", gsub("Parastrial nucleus","Unknown", gsub("Supramammillary nucleus, lateral part","SMN", gsub("Supramammillary nucleus, medial part","SMN", gsub("Tuberomammillary nucleus, dorsal part","TM", gsub("Periventricular hypothalamic nucleus, intermediate part","PVH", gsub("Periventricular hypothalamic nucleus, posterior part","PVH", gsub("Periventricular hypothalamic nucleus, preoptic part","PVH", gsub("Retrochiasmatic area","Unkown", gsub("Lateral hypothalamic area","LH", gsub("Lateral mammillary nucleus","MN", gsub("Arcuate hypothalamic nucleus","ARC", gsub("Lateral preoptic area","PO", gsub("Anteroventral preoptic nucleus" ,"PO", gsub("Anteroventral periventricular nucleus" ,"PVH", gsub("Suprachiasmatic nucleus","SCN", gsub("Subparaventricular zone" ,"PVH", gsub("Parasubthalamic nucleus" ,"Unknown", gsub("Supraoptic nucleus" ,"PVH", gsub("Median preoptic nucleus" ,"PO", gsub("Paraventricular hypothalamic nucleus, descending division, lateral parvicellular part" ,"PVH", gsub("Subthalamic nucleus" ,"Unknown", gsub("Medial mammillary nucleus" ,"MN", gsub("Medial mammillary nucleus, median part" ,"MN", scCocoScores$name)))))))))))))))))))))))))))
+scCocoScores$Names_Reduced = gsub("Medial preoptic nucleus" ,"PO", gsub("Medial preoptic area" ,"PO", gsub("Paraventricular hypothalamic nucleus, parvicellular division, anterior parvicellular part" ,"PVH", gsub("Tuberal nucleus" ,"Unknown", gsub("Paraventricular hypothalamic nucleus, magnocellular division, posterior magnocellular part, lateral zone","PVH", gsub("Dorsomedial nucleus of the hypothalamus, anterior part" ,"DMH", gsub("Dorsomedial nucleus of the hypothalamus, posterior part" ,"DMH", gsub("Dorsomedial nucleus of the hypothalamus, ventral part" ,"DMH", gsub("Ventrolateral preoptic nucleus","PO", gsub("Anterior hypothalamic nucleus, anterior part" ,"PO", gsub("Anterior hypothalamic nucleus, central part" ,"PO", gsub("Anterodorsal preoptic nucleus","PO", gsub("Anterior hypothalamic nucleus, posterior part" ,"PO",  gsub("Medial preoptic nucleus, central part" ,"PO", gsub("Medial preoptic nucleus, lateral part" ,"PO", gsub("Medial preoptic nucleus, medial part" ,"PO", gsub("Vascular organ of the lamina terminalis" ,"Unknown", gsub("Ventromedial hypothalamic nucleus, central part" ,"VMH", gsub("Ventromedial hypothalamic nucleus, dorsomedial part" ,"VMH", gsub("Ventromedial hypothalamic nucleus, ventrolateral part" ,"VMH", gsub("Dopaminergic A13 group" ,"Unknown", gsub("Zona incerta" ,"ZI", gsub("Fields of Forel","Unknown", gsub("Paraventricular hypothalamic nucleus, parvicellular division, medial parvicellular part, dorsal zone" ,"PVH", gsub("Posterodorsal preoptic nucleus" ,"PO", gsub("Posterior hypothalamic nucleus" ,"Unknown", gsub("Dorsal premammillary nucleus", "MN", scCocoScores$Names_Reduced)))))))))))))))))))))))))))
+write.csv(scCocoScores, "scCocoScores_Table.csv")
+
+scCoco_Parsed = as.data.frame(matrix(ncol = 5, nrow = 0))
+colnames(scCoco_Parsed) = c("LongNames", "ShortNames", "Value", "Rank", "Cluster")
+
+for(x in 3:55){
+GetTop =  scCocoScores %>% top_n(3, wt=scCocoScores[[x]])
+GetTop = GetTop[order(-GetTop[[x]]), ]  
+GetTop$Rank = seq(1,3,1)
+
+CompilescCoco = GetTop %>% dplyr::select("name", "Names_Reduced", colnames(scCocoScores)[[x]], "Rank")
+colnames(CompilescCoco) = c("LongNames", "ShortNames", "Value", "Rank")
+CompilescCoco$Cluster = colnames(scCocoScores)[[x]]
+scCoco_Parsed = rbind(scCoco_Parsed, CompilescCoco)
+}
+scCoco_Parsed$Cluster = gsub("clust_", "", scCoco_Parsed$Cluster)
+
+
+Adult_Annots$K55Dups = duplicated(Adult_Annots$K55)
+Adult_Annots_K55 = subset(Adult_Annots, Adult_Annots$K55Dups == F)
+Pull_K55 = Adult_Annots_K55 %>% dplyr::select(K55, K55Nuclei)
+colnames(Pull_K55) = c("Cluster", "ShortNames")
+Pull_K55$LongNames = NA; Pull_K55$Value = NA; Pull_K55$Rank = 4
+
+scCoco_Parsed = rbind(scCoco_Parsed, Pull_K55)
+scCoco_Parsed$Cluster = as.numeric(scCoco_Parsed$Cluster)
+scCoco_Parsed$Cluster = factor(scCoco_Parsed$Cluster, levels = rev(sort(unique(scCoco_Parsed$Cluster))))
+
+## Generate heatmap of cluster annotations from scCoco + our annotations ##
+###########################################################################
+
+Matching = ggplot(scCoco_Parsed, aes(x = Rank, y = Cluster, fill = ShortNames)) +
+  geom_tile(color = "white") + scale_fill_manual(values = c(NucleiColors, "Unknown" = "darkgrey")) + theme(axis.title = element_blank(), axis.ticks = element_blank(), axis.title.x = element_blank(), legend.position = "none")+scale_x_discrete(expand=c(0, 0))+  scale_y_discrete(expand=c(0, 0))
+pdf(paste("scCocoMatches.pdf", sep=""), width = 6, height = 10)
+print(Matching)
+dev.off()
+```
+
+
+###############################################
+###### GENERATE DOTPLOTS FOR MAIN + SUPP ######
+###############################################
+```{r}
+EdKaZhouHypoNeurons@meta.data$K116Nuclei  = ifelse(EdKaZhouHypoNeurons@meta.data$Age %in% c(29,42,50), EdKaZhouHypoNeurons@meta.data$K116Nuclei, "Fetal")
+EdKaZhouHypoNeurons@meta.data$K116Class  = ifelse(EdKaZhouHypoNeurons@meta.data$Age %in% c(29,42,50), EdKaZhouHypoNeurons@meta.data$K116Class, "Fetal")
+
+
+############ CONDENSED DOTPLOT FOR MAIN ############# 
+#####################################################
+HumanAdultSeu = AddMetaData(HumanAdultSeu, PullK116Nuclei, "K116Nuclei")
+HumanAdultSeu@meta.data$K116_Clust_Annot = paste("[", HumanAdultSeu@meta.data$K116Nuclei, "] ",  HumanAdultSeu@meta.data$K116, sep="")
+
+DefaultAssay(HumanAdultSeu) = "RNA"
+Idents(HumanAdultSeu) = "K116_Clust_Annot"
+
+Genes2 = c("HDC", "TBX3", "ISL1", "HMX2", "SIM1", "POU3F2", "FEZF1","NPTX2", "GABRA5", "PPP1R17", "GRP","LHX8", "RFX4", "PDYN","HCRT", "LHX2", "PMCH",  "ARX","RELN","LHX6", "LMX1A",  "BARHL1","FOXB1", "PITX2",  "MEIS2")
+
+
+HumanAdultSeu@meta.data$K116_Clust_Annot = factor(HumanAdultSeu@meta.data$K116_Clust_Annot, levels = rev(c("[TM] 18", "[TM] 42", "[TM] 88", "[ARC] 7",  "[ARC] 55","[ARC] 109","[ARC] 44", "[ARC] 49","[ARC] 39",  "[ARC] 16", "[ARC] 22", "[ARC] 34", "[ARC] 41", "[ARC] 43",  "[ARC] 50", "[ARC] 52", "[ARC] 57", "[ARC] 60", "[ARC] 62",  "[ARC] 71", "[ARC] 74", "[ARC] 79", "[ARC] 81", "[ARC] 93", "[ARC] 97", "[ARC] 102",  "[ARC] 113", "[PVH] 83", "[PVH] 85", "[PVH] 89", "[PVH] 95", "[PVH] 98", "[PVH] 103",  "[PVH] 115",  "[PVH] 25", "[PVH] 36", "[PVH] 66", "[PVH] 69", "[PVH] 107",  "[VMH] 3",  "[VMH] 26", "[VMH] 30", "[VMH] 31", "[VMH] 47", "[VMH] 64", "[VMH] 104",  "[DMH] 32", "[DMH] 63", "[DMH] 75","[DMH] 118",   "[LH] 59", "[LH] 76",  "[LH] 117", "[SCN] 38", "[SCN] 45", "[SCN] 54", "[SCN] 91", "[SCN] 100", "[SCN] 105","[PO] 10", "[PO] 27", "[PO] 37", "[PO] 51", "[PO] 78", "[PO] 80", "[PO] 87", "[PO] 90", "[PO] 92", "[PO] 106", "[PO] 112", "[SMN] 8", "[SMN] 19", "[SMN] 28", "[SMN] 40", "[SMN] 46", "[SMN] 58",  "[SMN] 82", "[SMN] 84", "[MN] 0", "[MN] 1", "[MN] 2",  "[MN] 5", "[MN] 6","[MN] 9","[MN] 12", "[MN] 14",  "[MN] 23", "[MN] 29", "[MN] 33", "[MN] 56",  "[MN] 61", "[MN] 70", "[MN] 72", "[MN] 86", "[MN] 94",  "[MN] 108", "[MN] 15",  "[ZI] 4","[ZI] 11", "[ZI] 21", "[ZI] 35","[ZI] 110", "[Unassigned] 13", "[Unassigned] 20", "[Unassigned] 24", "[Unassigned] 38", "[Unassigned] 48", "[Unassigned] 68", "[Unassigned] 101")))
+Idents(HumanAdultSeu) = "K116_Clust_Annot"
+
+HumanAdultSeuRmUkn = subset(HumanAdultSeu, idents = c("[Unassigned] 13", "[Unassigned] 20", "[Unassigned] 24", "[Unassigned] 38", "[Unassigned] 48", "[Unassigned] 68", "[Unassigned] 101"), invert=T)
+
+
+pdf("K116_DotPlot_K116Annotated_short_v2.pdf", width = 5, height = 6.6)
+print(DotPlot(HumanAdultSeuRmUkn, features = Genes2,  assay = "RNA", col.min=0, dot.min = 0.1, cols = c("lightgrey",BlueMedDark), dot.scale = 1.5)+theme(axis.text.x = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5, face = "italic"), axis.text.y = element_text(size = 4), axis.title = element_blank())) 
+dev.off()
+
+######## LONG DOTPLOT FOR SUPP - K116 LEVEL  ######## 
+#####################################################
+HumanAdultSeu@meta.data$K116_Clust_Annot = factor(HumanAdultSeu@meta.data$K116_Clust_Annot, levels = rev(c("[TM] 18", "[TM] 42", "[TM] 88", "[ARC] 7", "[ARC] 16", "[ARC] 22", "[ARC] 34", "[ARC] 39", "[ARC] 41", "[ARC] 43", "[ARC] 44", "[ARC] 49", "[ARC] 50", "[ARC] 52", "[ARC] 55", "[ARC] 57", "[ARC] 60", "[ARC] 62",  "[ARC] 71", "[ARC] 74", "[ARC] 79", "[ARC] 81", "[ARC] 93", "[ARC] 97", "[ARC] 102", "[ARC] 109", "[ARC] 113", "[PVH] 25", "[PVH] 36", "[PVH] 66", "[PVH] 69", "[PVH] 83", "[PVH] 85", "[PVH] 89", "[PVH] 95", "[PVH] 98","[PVH] 103", "[PVH] 107", "[PVH] 115", "[VMH] 3",  "[VMH] 26", "[VMH] 30", "[VMH] 31", "[VMH] 47", "[VMH] 64", "[VMH] 104",  "[DMH] 32", "[DMH] 63", "[DMH] 75","[DMH] 118",   "[LH] 59", "[LH] 76",  "[LH] 117", "[SCN] 38", "[SCN] 45", "[SCN] 54", "[SCN] 91", "[SCN] 100", "[SCN] 105","[PO] 10", "[PO] 27", "[PO] 37", "[PO] 51", "[PO] 78", "[PO] 80", "[PO] 87", "[PO] 90", "[PO] 92", "[PO] 106", "[PO] 112", "[SMN] 8", "[SMN] 19", "[SMN] 28", "[SMN] 40", "[SMN] 46", "[SMN] 58",  "[SMN] 82", "[SMN] 84", "[MN] 0", "[MN] 1", "[MN] 2",  "[MN] 5", "[MN] 6","[MN] 9","[MN] 12", "[MN] 14", "[MN] 15",  "[MN] 23", "[MN] 29", "[MN] 33", "[MN] 56",  "[MN] 61", "[MN] 70", "[MN] 72", "[MN] 86", "[MN] 94",  "[MN] 108",  "[ZI] 4", "[ZI] 11", "[ZI] 21", "[ZI] 35","[ZI] 110","[Unassigned] 13", "[Unassigned] 20", "[Unassigned] 24", "[Unassigned] 38", "[Unassigned] 48", "[Unassigned] 68", "[Unassigned] 101")))
+Idents(HumanAdultSeu) = "K116_Clust_Annot"
+
+Genes = c("HDC", "TBX3",  "LEPR","ISL1","LEF1","POMC","HMX2","GSX1",  "GHRH", "AGRP", "KISS1", "GAL","GHSR","PGR", "ESR1", "SIM1", "POU3F2", "NHLH2","PRDM8", "OTP","PCSK1","TRH","TH","OXT", "SST", "AVP","CRH","GLP1R", "MC4R", "NPY",  "CARTPT","FEZF1","NPTX2","NR5A1","SOX14", "GABRA5","PPP1R17", "GPR50", "GRP","LHX8","CCK", "LHX9", "RFX4", "PDYN","HCRT", "LHX2", "TAC1", "PMCH", "SIX3", "SIX6","RGS16", "VAX1", "RELN","VIP", "NR2F1", "NR2F2", "LHX6", "ARX","NFIX", "SOX6", "BARHL1","LMX1A",   "FOXA1","IRX3", "IRX5",  "EBF1", "EBF2", "LHX1","PITX2", "FOXB1",  "FOXP2","BDNF",  "MEIS2")
+
+DefaultAssay(HumanAdultSeu) = "RNA"
+
+pdf("K116_DotPlot_K116Annotated.pdf", width = 15, height = 20)
+print(DotPlot(HumanAdultSeu, features = Genes, assay = "RNA", col.min=0, dot.min = 0.1, cols = c("lightgrey",BlueMedDark))+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, face = "italic"))) 
+dev.off()
+```
+
+###############################################
+##### GENERATE ALLUVIAL PLOTS MULTI LEVELS ####
+###############################################
+```{r}
+MultiKAnnot = read.csv("~/MultiKAnnot_Annotations.csv")
+
+Alluvial_Nuclei = Adult_Annots %>% dplyr::select("K6Nuclei", "K55Nuclei", "K_116Nuclei", "Nuclei_K560")
+Alluvial_Nuclei$x = 1
+FreqAssigns = Alluvial_Nuclei %>% group_by(K6Nuclei, K55Nuclei, K_116Nuclei, Nuclei_K560) %>% dplyr::summarise(Freq = sum(x))
+#FreqAssigns = gsub("", "Unassigned", FreqAssigns)
+#FreqAssigns[is.na(FreqAssigns)] = "Unassigned" 
+FreqAssigns$K6Nuclei = factor(FreqAssigns$K6Nuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned"))
+FreqAssigns$K55Nuclei = factor(FreqAssigns$K55Nuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned"))
+FreqAssigns$K_116Nuclei = factor(FreqAssigns$K_116Nuclei, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned"))
+FreqAssigns$Nuclei_K560 = factor(FreqAssigns$Nuclei_K560, levels = c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "ID", "SMN", "MN", "ZI", "Unassigned"))
+
+Alluvial =ggplot(data = FreqAssigns,
+       aes(axis1 = K6Nuclei,   # First variable on the X-axis
+           axis2 = K55Nuclei,
+           axis3 = K_116Nuclei,
+            axis4 = Nuclei_K560,# Second variable on the X-axis
+           y = Freq)) +
+  geom_alluvium(aes(fill = K_116Nuclei)) +
+  geom_stratum( color = "grey") +
+  geom_text(stat = "stratum", size = 2, face = "bold",
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("K_116Nuclei", "K_116Nuclei"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+NoLegend()+ scale_fill_manual(values = NucleiColors)
+
+pdf(paste("Fig2_MultiK_comparison.pdf", sep=""), width = 12, height = 5)
+print(Alluvial)
+dev.off()
+
+
+K6to55 = as.data.frame(table(Alluvial_Nuclei$K6Nuclei == Alluvial_Nuclei$K55Nuclei))
+PIE = ggplot(K6to55, aes(x="", y=Freq, fill=Var1)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+
+pdf(paste("K6to55_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+
+K55to116 = as.data.frame(table(Alluvial_Nuclei$K_116Nuclei == Alluvial_Nuclei$K55Nuclei))
+PIE = ggplot(K55to116, aes(x="", y=Freq, fill=Var1)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+
+pdf(paste("K55to116_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+
+K116to560 = as.data.frame(table(Alluvial_Nuclei$K_116Nuclei == Alluvial_Nuclei$Nuclei_K560))
+PIE = ggplot(K116to560, aes(x="", y=Freq, fill=Var1)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+theme_void() +theme() + scale_fill_manual(values = c(BlueLighest, DarkOrange))
+
+pdf(paste("K116to560_PieChart.pdf", sep=""), width = 3, height = 3)
+print(PIE)
+dev.off()
+```
+
+###############################################
+####### GENERATE PSEUDOTIME TRAJECTORIES ######
+###############################################
+```{r}
+GeneList = c("SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1",  "SLC17A6", "SLC17A8", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SIM1", "POU3F2",  "NHLH2", "MC4R", "OXT", "AVP", "CRH", "GAL", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "PITX2", "FOXP1", "FOXP2", "FOXB1", "SOX14",  "FEZF2", "LHX1", "HCRT", "CARTPT", "PMCH", "LHX2", "LHX9", "PDYN", "RGS16","LHX1", "GRP", "VIP", "CCK", "VAX1", "SIX3", "SIX6" , "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5", "PPP1R17", "NKX2-2", "LHX8", "NR2F1", "NR2F2", "HMX3", "RELN", "MEIS2", "ARX", "LHX6", "PRDM8")
+
+Dimensions = data.frame(PCA = c(20, 20, 20, 20), UMAP = c(20, 20, 20, 20), spread = c(3, 3, 3, 6), kval = c(100, 20, 150, 100))
+StartTime = "GW10"
+SeuName = "Fig2_Trajectories_"
+
+for(x in 1:dim(Dimensions)[1]){
+PullDim = subset(Dimensions, row.names(Dimensions) %in% x)
+get.PCs = PullDim[[1]]
+get.UMAPs = PullDim[[2]]
+get.spread = PullDim[[3]]
+get.kval = PullDim[[4]]
+
+Filename = paste(SeuName, "_",get.PCs,"_",get.UMAPs, "_", get.spread, sep="")
+DefaultAssay(EdKaZhouHypoNeurons) = "integrated"
+EdKaZhouHypoNeurons = RunPCA(EdKaZhouHypoNeurons, npcs = get.PCs)
+EdKaZhouHypoNeurons <- RunUMAP(EdKaZhouHypoNeurons, dims = 1:get.UMAPs, spread= get.spread, n.components = 3)
+DefaultAssay(EdKaZhouHypoNeurons) = "RNA"
+
+### monocle 3
+dir.create(file.path( Filename))
+geneMeta = data.frame(gene_short_name=rownames(EdKaZhouHypoNeurons))    
+rownames(geneMeta) = rownames(EdKaZhouHypoNeurons)
+DefaultAssay(EdKaZhouHypoNeurons) = 'integrated' 
+M3Seu <- new_cell_data_set(EdKaZhouHypoNeurons@assays$RNA@counts,cell_metadata = EdKaZhouHypoNeurons@meta.data, gene_metadata = geneMeta)
+M3Seu <- preprocess_cds(M3Seu, num_dim = get.PCs)
+M3Seu <- reduce_dimension(M3Seu)
+M3Seu@reduce_dim_aux$gene_loadings = EdKaZhouHypoNeurons@reductions[["pca"]]@feature.loadings[,1:get.PCs]
+reducedDims(M3Seu)[['UMAP']] = EdKaZhouHypoNeurons@reductions[["umap"]]@cell.embeddings ## from code - UMAP by cell 
+kval = get.kval
+dir.create(file.path(Filename, paste("KVal", kval, sep="")))
+M3Seu <- cluster_cells(M3Seu,reduction_method = "UMAP", k = kval)
+M3Seu <- learn_graph(M3Seu)
+
+Pull = as.data.frame(paste('Y_',M3Seu@principal_graph_aux[['UMAP']]$pr_graph_cell_proj_closest_vertex[,1],sep=''))
+row.names(Pull) = colnames(M3Seu)
+colnames(Pull) = "Vertex"
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, Pull, "Vertex")
+write.csv(EdKaZhouHypoNeurons@meta.data, paste(Filename, "_k", VertexbyBarc, ".csv", sep=""))
+Pull2 = merge(Pull, Timepoints, by = 0)
+
+Pull2$Val = 1
+Pull_n = as.data.frame(table(Pull2$SampleBroad))
+Pull3 = Pull2 %>% dplyr::group_by(Vertex, SampleBroad) %>% dplyr::summarise(n_ = sum(Val, na.rm=T))
+Pull4 = as.data.frame(table(Pull2$Vertex))
+Pull5 = merge(Pull3, Pull4, by.x = "Vertex", by.y = "Var1")
+Pull5$Percent = Pull5$n_/Pull5$Freq
+PullCS22 = subset(Pull5, Pull5$SampleBroad == StartTime & Pull5$Freq > 20)
+PullCS22 = PullCS22[order(-PullCS22$Percent), ]
+
+OUTS = as.data.frame(M3Seu@clusters$UMAP$partitions)
+OUTS2 = merge(OUTS, Pull, by = 0)
+OUTS3 = as.data.frame(table(OUTS2$`M3Seu@clusters$UMAP$partitions`))
+OUTS3$Perc = OUTS3$Freq/ dim(OUTS)[1]
+OUTS4 = subset(OUTS3, OUTS3$Perc > 0.4)
+OUTS5 = subset(OUTS2, OUTS2$`M3Seu@clusters$UMAP$partitions` == 1)
+
+Vertexes = subset(PullCS22, PullCS22$Vertex %in% OUTS5$Vertex)
+if(dim(OUTS4)[1] <= 0.5){
+BadPartitions =  0
+write.csv(BadPartitions, paste(Filename, "/KVal", kval,  "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "BADPARTITIONS.csv", sep=""))
+}
+#if(dim(OUTS4)[1] == 1){
+t = 1
+#for(t in seq(1,3,1)){
+Pull6 = subset(Pull, Pull$Vertex %in% Vertexes[[1]][t])
+M3SeuNODE = M3Seu
+M3SeuNODE <- order_cells(M3SeuNODE, root_pr_nodes=Vertexes[[1]][t])
+dir.create(file.path(paste(Filename, "/KVal", kval, sep=""), paste("Node", t, "_", Vertexes[[1]][t], sep="")))
+
+# FIG 2F
+p = plot_cells_3d(M3SeuNODE, color_cells_by = "pseudotime", cell_size = 10)
+htmlwidgets::saveWidget(p, "Pseudotime.html")
+
+
+p = plot_cells_3d(M3SeuNODE,color_cells_by = "partition")
+htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "k", kval, "Partition.html", sep=""))
+
+tmpLin = M3SeuNODE@principal_graph_aux[['UMAP']]["pseudotime"][[1]]
+tmpLin[which(tmpLin==Inf)] =50
+M3SeuNODEpseu = tapply(X=tmpLin,INDEX=Pull$Vertex,FUN=mean, na.rm = TRUE)
+#M3SeuNODEpseu = tapply(X=tmpLin,INDEX=colData(M3SeuNODE)$vertex,FUN=mean, na.rm = TRUE)
+mleaves = monocle3:::leaf_nodes(M3Seu,reduction_method='UMAP') ## 48  - 
+colData(M3Seu)$MonocleLeaf = NA
+colData(M3Seu)$MonocleLeaf[colData(M3Seu)$Vertex%in%names(mleaves)] = colData(M3Seu)$Vertex[colData(M3Seu)$Vertex%in%names(mleaves)]
+p=plot_cells_3d(M3Seu,color_cells_by = "MonocleLeaf",color_palette=hue_pal()(length(unique(colData(M3Seu)$MonocleLeaf))))
+htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "MonocleLeaves.html", sep=""))
+
+mbranches = monocle3:::branch_nodes(M3Seu,reduction_method='UMAP') ##49
+colData(M3Seu)$MonocleBranch = NA
+colData(M3Seu)$MonocleBranch[colData(M3Seu)$Vertex%in%names(mbranches)] = colData(M3Seu)$Vertex[colData(M3Seu)$Vertex%in%names(mbranches)]
+p=plot_cells_3d(M3Seu,color_cells_by = "MonocleBranch",color_palette=hue_pal()(length(unique(colData(M3Seu)$MonocleBranch))))
+htmlwidgets::saveWidget(p, paste(Filename, "/KVal", kval,  "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "MonocleBranches.html", sep=""))
+
+colData(M3Seu)$Leaves_Branches = NA
+colData(M3Seu)$Leaves_Branches[colData(M3Seu)$Vertex%in%c(names(mleaves), names(mbranches))] = colData(M3Seu)$Vertex[colData(M3Seu)$Vertex%in%c(names(mleaves), names(mbranches))]
+
+colrange_branches <- colorRampPalette(c("#d1e3d1", "#087508")) #green
+colrange_branches_n <- colrange_branches(length(unique(mbranches)))
+colrange_branches_ndf = as.data.frame(colrange_branches_n)
+colrange_branches_ndf$Vertex = unique(mbranches)
+colnames(colrange_branches_ndf) = c("Colour", "Vertex")
+
+colrange_leaves <- colorRampPalette(c("#ffd4b3", "#f77007")) #orange
+colrange_leaves_n <- colrange_leaves(length(unique(mleaves)))
+colrange_leaves_ndf = as.data.frame(colrange_leaves_n)
+colrange_leaves_ndf$Vertex = unique(mleaves)
+colnames(colrange_leaves_ndf) = c("Colour", "Vertex")
+
+CombineColors = rbind(colrange_leaves_ndf, colrange_branches_ndf)
+CombineColors = CombineColors[order(CombineColors$Vertex), ]
+OutsColor =  CombineColors$Colour
+names(OutsColor) = paste("Y_", CombineColors$Vertex, sep="")
+
+p=plot_cells_3d(M3Seu,color_cells_by = "Leaves_Branches",color_palette=OutsColor)
+htmlwidgets::saveWidget(p, paste(Filename, "/KVal", kval,  "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval,  "MonocleLeavesandBranches.html", sep=""))
+
+rtti287m = data.frame(root=rep(Vertexes[[1]][t],length(unique(mleaves))), leaf=paste("Y_", unique(mleaves), sep=""))
+rtti287m2 = subset(rtti287m, rtti287m$leaf %in% OUTS5$Vertex)
+linksNODE = data.frame(matrix(ncol = 3, nrow = 0))
+colnames(linksNODE) = c("from", "to", "weight")
+for(i in seq(1, nrow(rtti287m2), 1)){
+FROM=rtti287m2$root[i]
+TO=rtti287m2$leaf[i]
+lins = all_simple_paths(M3Seu@principal_graph[['UMAP']],FROM,TO)
+lengs = unlist(lapply(lins,FUN=length))
+shortInd = which(lengs==min(lengs))
+if(length(lins) > 0){
+shortInd = shortInd[[1]]
+tmpLin = lins[[shortInd]]
+tmpEdge = data.frame(from = paste('Y_',as.vector(tmpLin[-length(tmpLin)]),sep=''),to=paste('Y_',as.vector(tmpLin[-1]),sep=''))
+tmpWeight = abs(M3SeuNODEpseu[tmpEdge$to] - M3SeuNODEpseu[tmpEdge$from])
+tmpEdge$weight = tmpWeight
+if(dim(linksNODE)[1]==0){
+linksNODE = tmpEdge
+} else {
+linksNODE = rbind(linksNODE,tmpEdge)
+}
+}
+
+}
+
+
+linksNODE = unique(linksNODE)
+nodesNODE = data.frame(id=unique(c(linksNODE$from,linksNODE$to)))
+nodesNODE$type = 'lineage'
+nodesNODE$type[nodesNODE$id%in%names(table(linksNODE$from)[which(table(linksNODE$from)>1)])] = 'branch' 
+nodesNODE$type[nodesNODE$id==PullCS22[[1]][t]] = 'root'
+nodesNODE$type[nodesNODE$id%in%names(table(c(linksNODE$from,linksNODE$to))[which(table(c(linksNODE$from,linksNODE$to))==1)])] = 'leaf'
+nodesNODE$type2 = 4
+nodesNODE$type2[nodesNODE$id%in%names(table(linksNODE$from)[which(table(linksNODE$from)>1)])] = 3
+nodesNODE$type2[nodesNODE$id==PullCS22[[1]][t]] = 1
+nodesNODE$type2[nodesNODE$id%in%names(table(c(linksNODE$from,linksNODE$to))[which(table(c(linksNODE$from,linksNODE$to))==1)])] = 2
+nodesNODE$rbl = nodesNODE$id
+nodesNODE$rbl[nodesNODE$type%in%'lineage']='' ## can add other columns with metadata
+net.NODE <- graph_from_data_frame(d=linksNODE, vertices=nodesNODE, directed=T)
+V(net.NODE)$size <- c(10,5,3,2)[V(net.NODE)$type2]
+V(net.NODE)$frame.color <- "white"
+V(net.NODE)$color <- c("darkgray","skyblue3","skyblue2","gray")[V(net.NODE)$type2]
+V(net.NODE)$label <- V(net.NODE)$rbl #V(net.NODE)$label <- ""
+E(net.NODE)$arrow.mode <- 0
+#Used in Fig 2E & F and supplementals
+lrt.NODE = layout_as_tree(net.NODE)
+pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineage.pdf", sep=""),width=12,height=8)
+print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+dev.off()
+
+V(net.NODE)$label <- ""
+lrt.NODE = layout_as_tree(net.NODE)
+pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageNoLabs.pdf", sep=""),width=12,height=8)
+print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+dev.off()
+
+
+#Used for assigning lineages
+V(net.NODE)$label <- V(net.NODE)$name #V(net.NODE)$label <- ""
+pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageAllLabs.pdf", sep=""),width=24,height=16)
+print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+dev.off()
+
+write.csv(nodesNODE, paste(Filename, "_k", kval, "_NodesOrder.csv", sep=""))
+
+#Used supplementals
+ind = which(OUTS5$Vertex %in%nodesNODE$id)
+for(i in c(GeneList)){ 
+gene = i
+tmpGene = EdKaZhouHypoNeurons@assays$RNA@counts[gene,ind]
+tmpGeneVertex = tapply(X=tmpGene,INDEX=EdKaZhouHypoNeurons@meta.data$Vertex[ind],FUN=mean)
+tmpGeneVertex2 = round(scales::rescale(tmpGeneVertex, to = c(1, 100)),0)
+fun_color_range <- colorRampPalette(c("#919191", "red"))
+my_colors <- fun_color_range(100)
+tmpGeneColors = my_colors[tmpGeneVertex2]
+names(tmpGeneColors) = names(tmpGeneVertex2)
+V(net.NODE)$color <- tmpGeneColors[as.vector(nodesNODE$id)]
+
+pdf(paste(Filename, "/KVal", kval,  "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "_ShortestPath_Lineage_", i, ".pdf", sep=""),width=12,height=8)
+print(plot(net.NODE,layout=lrt.NODE, vertex.label =NA, label = i))
+dev.off()
+}
+
+save.image(paste(Filename, "_k", kval, ".RData", sep=""))
+}
+  
+#}
+#}
+```
+
+###############################################
+######### PLOT PSEUDOTIME TRAJECTORIES ########
+###############################################
+```{r}
+######### EXTRAPOLATE FETAL NUCLEI ########## 
+#############################################
+MainAssign = read.csv("Fig2_Trajectories_20_20_3_k100VertexbyBarc.csv", na.strings=c("","NA"))
+MainAssign$AdultFetal = ifelse(MainAssign$SampleAdult == "Adult", "Adult", "Fetal")
+AdultFetalPcts = as.data.frame(table(MainAssign$AdultFetal))
+
+EdKaZhouHypoNeurons@meta.data$K116NucleiFetalAssign = EdKaZhouHypoNeurons@meta.data$K116Nuclei
+EdKaZhouHypoNeurons@meta.data$K116ClassFetalAssign = EdKaZhouHypoNeurons@meta.data$K116Class
+
+for(x in unique(MainAssign$Vertex)){
+PullVertex = subset(MainAssign, MainAssign$Vertex == x)
+PullCells = subset(EdKaZhouHypoNeurons@meta.data, row.names(EdKaZhouHypoNeurons@meta.data) %in% PullVertex$Barcs)
+TabCells = as.data.frame(table(PullCells$K116Nuclei))  
+TabCells = TabCells[order(-TabCells$Freq), ]
+TabClass = as.data.frame(table(PullCells$K116Class))  
+TabClass = TabClass[order(-TabClass$Freq), ]
+if("Fetal" %in% TabCells$Var1){
+CalcPctFetal = subset(TabCells, TabCells$Var1 =="Fetal")[[2]][[1]]/sum(TabCells$Freq)*100
+CalcPctFetalClass = subset(TabClass, TabClass$Var1 =="Fetal")[[2]][[1]]/sum(TabClass$Freq)*100
+
+if(CalcPctFetal < 100){
+PullAdult = subset(TabCells, ! TabCells$Var1 =="Fetal")
+CalcPctAdult =  PullAdult[[2]][[1]]/sum(TabCells$Freq)*100
+
+PullAdultClass = subset(TabClass, ! TabClass$Var1 =="Fetal")
+CalcPctAdultClass =  PullAdultClass[[2]][[1]]/sum(PullAdultClass$Freq)*100
+
+if(CalcPctFetal < 60 & CalcPctAdult > 20 | CalcPctFetal < 80 & dim(PullAdult)[1] <= 3){ #Reassign Nuclei
+EdKaZhouHypoNeurons@meta.data$K116NucleiFetalAssign = ifelse(row.names(EdKaZhouHypoNeurons@meta.data) %in% PullVertex$Barcs & EdKaZhouHypoNeurons@meta.data$FetalAdult %in% "Fetal", as.character(PullAdult[[1]][[1]]), EdKaZhouHypoNeurons@meta.data$K116NucleiFetalAssign)
+
+}
+if(CalcPctFetalClass < 75 & CalcPctAdultClass > 40){ 
+EdKaZhouHypoNeurons@meta.data$K116ClassFetalAssign = ifelse(row.names(EdKaZhouHypoNeurons@meta.data) %in% PullVertex$Barcs & EdKaZhouHypoNeurons@meta.data$FetalAdult %in% "Fetal", as.character(PullAdultClass[[1]][[1]]), EdKaZhouHypoNeurons@meta.data$K116ClassFetalAssign)
+}}}}
+
+ExtrapolatedAssigns = EdKaZhouHypoNeurons@meta.data %>% dplyr::select(K116NucleiFetalAssign, K116ClassFetalAssign)
+
+
+##########################################################################
+######### ITERATE TRAJECTORIES BASED ON ESTABLISHED ANNOTATIONS ########## 
+##########################################################################
+
+#ADD KEY ANNOTATIONS
+K116NucleiFetalAssign = ExtrapolatedAssigns %>% dplyr:: select(K116NucleiFetalAssign)
+K116ClassFetalAssign = ExtrapolatedAssigns %>% dplyr:: select(K116ClassFetalAssign)
+
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, K116ClassFetalAssign, "K116ClassFetalAssign")  
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, K116NucleiFetalAssign, "K116NucleiFetalAssign")  
+
+EdKaZhouHypoNeurons$Stage = "Trimester1"
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%c('GW15','GW16','GW18','GW19','GW20','GW22','GW25'),'Stage'] = 'Trimester2'
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%"Adult",'Stage'] = 'Adult'
+
+EdKaZhouHypoNeurons$TimepointAll = ifelse(EdKaZhouHypoNeurons$Age %in% c(29,42,50), paste("Adult_", EdKaZhouHypoNeurons$Age, "YO", sep=""), EdKaZhouHypoNeurons$SampleAdult)
+
+EdKaZhouHypoNeurons$Stage = "Trimester1"
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%c('GW15','GW16','GW18','GW19','GW20','GW22','GW25'),'Stage'] = 'Trimester2'
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%"Adult",'Stage'] = 'Adult'
+
+
+for(LIN in c("3_k100","3_k20",  "3_k150", "6_k100")){ #  
+load(paste("~/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, ".RData", sep=""))
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, Pull, "Vertex")
+
+  
+### BY NUCLEI 
+perSamp = vector(mode='list',length=length(unique(EdKaZhouHypoNeurons$Vertex)))
+names(perSamp)=unique(EdKaZhouHypoNeurons$Vertex)
+ 
+for(i in names(perSamp)){
+tmp = table(EdKaZhouHypoNeurons$K116NucleiFetalAssign[which(EdKaZhouHypoNeurons$Vertex==i)])
+tmp2=rep(0, length(unique(EdKaZhouHypoNeurons$K116NucleiFetalAssign)))
+names(tmp2)=c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "SMN", "MN", "ZI",  "Unassigned", "Fetal")
+tmpov = intersect(names(tmp),names(tmp2))
+tmp2[tmpov] = tmp[tmpov]
+tmpPer = round((tmp2/length(which(EdKaZhouHypoNeurons$Vertex==i)))*100,0)
+perSamp[[i]] = tmpPer
+}
+
+V(net.NODE)$pie.color=list(c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed,  "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark,  "SMN" = BlueLighest, "MN"= LightPurple, "ZI" = DarkPurple,  "Unassigned" = "darkgrey", "Fetal" = "lightgrey"))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste('./MainLineage_NoLabs_Nuclei_', LIN, '.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+dev.off()
+
+### BY NEUROTRANSMITTER
+EdKaZhouHypoNeurons$Stage = "Trimester1"
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%c('GW15','GW16','GW18','GW19','GW20','GW22','GW25'),'Stage'] = 'Trimester2'
+EdKaZhouHypoNeurons@meta.data[EdKaZhouHypoNeurons$SampleAdult%in%"Adult",'Stage'] = 'Adult'
+perSamp = vector(mode='list',length=length(unique(EdKaZhouHypoNeurons$Vertex)))
+names(perSamp)=unique(EdKaZhouHypoNeurons$Vertex)
+ 
+for(i in names(perSamp)){
+tmp = table(EdKaZhouHypoNeurons$K116ClassFetalAssign[which(EdKaZhouHypoNeurons$Vertex==i)])
+tmp2=rep(0, length(unique(EdKaZhouHypoNeurons$K116ClassFetalAssign)))
+names(tmp2)=c("Glutaminergic","GABAergic","Histaminergic", "Unknown", "Fetal")
+tmpov = intersect(names(tmp),names(tmp2))
+tmp2[tmpov] = tmp[tmpov]
+tmpPer = round((tmp2/length(which(EdKaZhouHypoNeurons$Vertex==i)))*100,0)
+perSamp[[i]] = tmpPer
+}
+
+V(net.NODE)$pie.color=list(c("#d64151","#386fa4","#aad576",  "darkgrey",  "lightgrey"))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste('./MainLineage_NoLabs_Class_', LIN, '.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+dev.off()
+
+### BY TRIMESTER
+perSamp = vector(mode='list',length=length(unique(EdKaZhouHypoNeurons$Vertex)))
+names(perSamp)=unique(EdKaZhouHypoNeurons$Vertex)
+ 
+for(i in names(perSamp)){
+tmp = table(EdKaZhouHypoNeurons$Stage[which(EdKaZhouHypoNeurons$Vertex==i)])
+tmp2=rep(0, length(unique(EdKaZhouHypoNeurons$Stage)))
+names(tmp2)=c("Trimester1","Trimester2","Adult")
+tmpov = intersect(names(tmp),names(tmp2))
+tmp2[tmpov] = tmp[tmpov]
+tmpPer = round((tmp2/length(which(EdKaZhouHypoNeurons$Vertex==i)))*100,0)
+perSamp[[i]] = tmpPer
+}
+
+V(net.NODE)$pie.color=list(c("#fecf29","#538d22","#ff7aa2"))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste('./MainLineage_NoLabs_Trimester_', LIN, '.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+dev.off()
+  
+
+### BY TIMEPOINT
+perSamp = vector(mode='list',length=length(unique(EdKaZhouHypoNeurons$Vertex)))
+names(perSamp)=unique(EdKaZhouHypoNeurons$Vertex)
+ 
+for(i in names(perSamp)){
+tmp = table(EdKaZhouHypoNeurons$TimepointAll[which(EdKaZhouHypoNeurons$Vertex==i)])
+tmp2=rep(0, length(unique(EdKaZhouHypoNeurons$TimepointAll)))
+names(tmp2)=c("GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25", "Adult_29YO", "Adult_42YO", "Adult_50YO")
+tmpov = intersect(names(tmp),names(tmp2))
+tmp2[tmpov] = tmp[tmpov]
+tmpPer = round((tmp2/length(which(EdKaZhouHypoNeurons$Vertex==i)))*100,0)
+perSamp[[i]] = tmpPer
+}
+
+
+V(net.NODE)$pie.color=list(c(LightPink, DarkPink, DarkRed, DarkOrange, LightOrange, Mustard, GreenLighest, GreenMedDark, BlueMedDark, BlueLighest, LightPurple, DarkPurple))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste('./MainLineage_NoLabs_Timepoint_', LIN, '.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+dev.off()
+}
+
+
+#####################################################
+######### LONG DOTPLOT FOR SUPP - BY TIME  ########## 
+#####################################################
+Idents(EdKaZhouHypoNeurons)= "K116NucleiFetalAssign"
+HumanNucAssigned = subset(EdKaZhouHypoNeurons, idents = c("Fetal", "Unassigned"), invert=T)
+HumanNucAssigned@meta.data$Nuclei_Timepoint = paste(HumanNucAssigned@meta.data$K116NucleiFetalAssign, HumanNucAssigned@meta.data$TimepointAll, sep = " - ")
+
+HumanNucAssigned@meta.data$Nuclei_Timepoint = factor(HumanNucAssigned@meta.data$Nuclei_Timepoint, levels = rev(c("TM - GW10", "TM - GW12", "TM - GW15", "TM - GW16", "TM - GW18", "TM - GW19", "TM - GW20", "TM - GW22", "TM - GW25", "TM - Adult_29YO", "TM - Adult_42YO", "TM - Adult_50YO","ARC - GW10", "ARC - GW12", "ARC - GW15", "ARC - GW16", "ARC - GW18", "ARC - GW19", "ARC - GW20", "ARC - GW22", "ARC - GW25", "ARC - Adult_29YO", "ARC - Adult_42YO", "ARC - Adult_50YO", "PVH - GW10", "PVH - GW12", "PVH - GW15", "PVH - GW16", "PVH - GW18", "PVH - GW19", "PVH - GW20", "PVH - GW22", "PVH - GW25", "PVH - Adult_29YO", "PVH - Adult_42YO", "PVH - Adult_50YO", "VMH - GW10", "VMH - GW12", "VMH - GW15", "VMH - GW16", "VMH - GW18", "VMH - GW19", "VMH - GW20", "VMH - GW22", "VMH - GW25", "VMH - Adult_29YO", "VMH - Adult_42YO", "VMH - Adult_50YO",  "DMH - GW10", "DMH - GW12", "DMH - GW15", "DMH - GW16", "DMH - GW18", "DMH - GW19", "DMH - GW20", "DMH - GW25", "DMH - Adult_29YO", "DMH - Adult_42YO", "DMH - Adult_50YO",   "LH - GW10", "LH - GW12", "LH - GW15", "LH - GW16", "LH - GW18", "LH - GW19", "LH - GW20", "LH - GW22", "LH - GW25", "LH - Adult_29YO", "LH - Adult_42YO", "LH - Adult_50YO", "SCN - GW10", "SCN - GW12", "SCN - GW15", "SCN - GW16", "SCN - GW18", "SCN - GW19", "SCN - GW20", "SCN - GW22", "SCN - GW25","SCN - Adult_29YO", "SCN - Adult_42YO", "SCN - Adult_50YO",  "PO - GW10", "PO - GW12", "PO - GW15", "PO - GW16", "PO - GW18", "PO - GW19", "PO - GW20", "PO - GW22", "PO - GW25",  "PO - Adult_29YO", "PO - Adult_42YO", "PO - Adult_50YO","SMN - GW10", "SMN - GW12", "SMN - GW15", "SMN - GW16", "SMN - GW18", "SMN - GW19", "SMN - GW20", "SMN - GW22", "SMN - GW25","SMN - Adult_29YO", "SMN - Adult_42YO", "SMN - Adult_50YO","MN - GW10", "MN - GW12", "MN - GW15", "MN - GW16", "MN - GW18", "MN - GW19", "MN - GW20", "MN - GW22", "MN - GW25", "MN - Adult_29YO", "MN - Adult_42YO", "MN - Adult_50YO", "ZI - GW10", "ZI - GW12", "ZI - GW15", "ZI - GW16", "ZI - GW18", "ZI - GW19", "ZI - GW20", "ZI - GW22", "ZI - GW25",  "ZI - Adult_29YO", "ZI - Adult_42YO", "ZI - Adult_50YO")))
+
+Idents(HumanNucAssigned) = "Nuclei_Timepoint"
+DefaultAssay(HumanNucAssigned) = "RNA"
+
+Genes = c("HDC", "TBX3",  "LEPR","ISL1","LEF1","POMC","HMX2","GSX1",  "GHRH", "AGRP", "KISS1", "GAL", "GHSR", "PGR", "ESR1", "SIM1", "POU3F2", "NHLH2","PRDM8", "OTP","PCSK1","TRH","TH","OXT", "SST", "AVP","CRH", "GLP1R",  "MC4R", "NPY",  "CARTPT","FEZF1","NPTX2","NR5A1","SOX14", "GABRA5","PPP1R17", "GPR50", "GRP","LHX8","CCK", "LHX9", "RFX4", "PDYN","HCRT", "LHX2", "TAC1", "PMCH", "SIX3", "SIX6","RGS16", "VAX1", "RELN","VIP", "NR2F1", "NR2F2", "LHX6", "ARX","NFIX", "SOX6", "BARHL1","LMX1A",   "FOXA1","IRX3", "IRX5",  "EBF1", "EBF2", "LHX1","PITX2", "FOXB1",  "FOXP2","BDNF",  "MEIS2")
+
+
+pdf("K116_DotPlot_Nuclei_TimeSplit.pdf", width = 15, height = 20)
+print(DotPlot(HumanNucAssigned, features = Genes, assay = "RNA", col.min=0, dot.min = 0.05, cols = c("lightgrey",BlueMedDark))+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, face = "italic"))) 
+dev.off()
+
+```
+
+
+###############################################
+############# SUPPLEMENTAL TABLES #############
+###############################################
+```{r}
+EdKaZhouHypoNeurons@meta.data$count = 1
+SupTableK116 = EdKaZhouHypoNeurons@meta.data %>% group_by(K116) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+SupTableK116$Fig1Assignments = factor(SupTableK116$K116, levels = sort(unique(SupTableK116$K116)))
+SupTableK116 = SupTableK116[order(SupTableK116$Fig1Assignments), ]
+write.csv(SupTableK116, "SciAdv_SupTableK116.csv", row.names = F)
+
+ExtrapolatedAssigns$K116ClassFetalAssign = NULL
+EdKaZhouHypoNeurons = AddMetaData(EdKaZhouHypoNeurons, ExtrapolatedAssigns, "ExtrapolatedAssigns")
+
+SupTableNuclei = EdKaZhouHypoNeurons@meta.data %>% group_by(ExtrapolatedAssigns) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTableNuclei, "SciAdv_SupTableNuclei.csv", row.names = F)
+
+```
+
+
+

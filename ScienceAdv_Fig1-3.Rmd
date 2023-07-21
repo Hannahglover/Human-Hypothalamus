@@ -103,11 +103,7 @@ return(MetaOutput)
 ########################################################################
 
 GeneLists = list()
-GeneLists[["Zhou_MainMarkers"]] = c("POMC", "VIM", "HES1", "HMGA2", "ARHGAP28", "NES", "ASCL1", "NBPF10", "NBPF15", "PLAGL1", "SFTA3", "STMN2", "SYT1", "SLC32A1", "GAD2", "HDC", "SLC17A6", "PDGFRA", "APOD", "GPR75-ASB3", "MBP", "MOG", "AQP4", "AGT", "FAM107A", "CCDC153", "CCDC74A", "CCDC74B", "LRTOMT", "AIF1", "CX3CR1", "CLDN5", "FLT1", "SLC38A5", "NDUFA4L2", "PDGFRB", "PTGDS", "COL1A1")
-
-GeneLists[["Zhou_MainMarkersV2"]] = c("OLIG1", "OLIG2", "SOX8", "JUNB", "EGR1",  "MYC", "OLIG1","OLIG2", "NKX2-2", "FOXJ1", "GLIS3", "AXNA1","TBX2", "TBX3", "LHX2", "RAX", "SHH",  "SIX3", "SIX6", "SLC1A3", "NES",  "FABP7", "FAM107A", "CD82","TBX3", "RAX", "SIX3", "OTX2", "IRX2", "IRX3", "IRX5", "DLX1", "DLX2", "DLX5", "DLX6", "SOX3", "LHX1", "ONECUT2", "OTP")
-
-
+GeneLists[["IntProg"]] = c("STMN2", "SYT1", "VIM1", "NEUROG2", "ASCL1", "EBF2", "NHLH1", "EBF3", "RND2", "RSPO3", "OTP", "SOX2", "LHX2", "VIM", "HES1", "NGN2", "SOX11", "DLL1", "DLL2", "DLX1", "DLX2")
 GeneLists[["BroadGenes"]] = c("SYT1", "SNAP25", "TUBB3","SYP", #Broad Neuronal 
                "SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1", #GABAergic
            "SLC17A6", "SLC17A8") #Glutaminergic
@@ -275,7 +271,7 @@ MedPink =     "#ff9ebb"
 DarkPink =    "#ff7aa2"
 DarkRed =     "#9e1b44"
 LightRed =    "#d64050"
-DarkOrange =  "#f36c44"
+DarkOrange =  "#f36c44" 
 LightOrange = "#faad60"
 Mustard =     "#fecf29"
 LightYellow = "#fee08b"
@@ -292,9 +288,9 @@ DarkPurple =  "#7251b5"
 Grey =        "#666666"
 HeatmapBlue = BlueMedDark
 
-CellPopColors = c("Neuroepithelial"= GreenLighest, "Dividing"= GreenMedLight, "RadialGlia" = GreenMedDark, "IntProgen" = GreenDark, "Oligodendrocytes [Dividing]"= BlueDark, "Oligodendrocytes [Immature]" = BlueMedDark, "Oligodendrocytes [Intermediate]"= BlueMedLight, "Oligodendrocytes [Mature]"= BlueLighest,  "NeuronalProgenitors" = LightPurple,  "Neuronal"= DarkPurple, "Astrocytes" = DarkPink, "Ependymal" = MedPink, "Tanycytes" = LightPink, "Microglia" = LightRed,   "Pericytes" = Mustard , "vSMC" =LightYellow,  "VLMC" = LightOrange,   "Endothelial" = DarkOrange,  "Blood" =DarkRed) #19
+CellPopColors = c("tRGC"= LightPink, "cRGC"= MedPink, "qRGC" = DarkPink, "IntProgen_1" = DarkRed, "IntProgen_2" = LightRed, "IntProgen_3" = "#c26e40",    "Neuronal"= DarkOrange, "Oligodendrocytes [Dividing]" = LightOrange, "Oligodendrocytes [Immature]" = Mustard, "Oligodendrocytes [Intermediate]"= LightYellow, "Oligodendrocytes [Mature]"= GreenLighest, "Astrocytes" = GreenMedLight, "Ependymal" = GreenMedDark, "Tanycytes" = GreenDark, "Microglia" = BlueDark, "Pericytes" = BlueMedDark, "vSMC" = BlueMedLight, "VLMC" = BlueLighest, "Endothelial"  = LightPurple, "Blood" = DarkPurple) #19
 
-TimepointColors_Fetal = c("GW6" = LightPink, "GW7" = DarkPink, "GW8" = DarkRed, "GW10" = DarkOrange, "GW12" = LightOrange, "GW15" = Mustard, "GW16" = GreenLighest, "GW18" = GreenMedDark, "GW19" = BlueMedDark, "GW20" = BlueLighest, "GW22" = LightPurple, "GW25" = DarkPurple) #12
+TimepointColors_Fetal = c("GW6" = BlueDark, "GW7" = DarkPurple, "GW8" = LightPurple, "GW10" = LightPink, "GW12" = DarkPink, "GW15" = DarkRed, "GW16" = DarkOrange, "GW18" = LightOrange, "GW19" = Mustard, "GW20" = GreenLighest, "GW22" = GreenMedDark, "GW25" = BlueMedDark, "GW20" = BlueLighest) #12
 
 TimepointColors_FetalZhou = c("GW6" = LightPink, "GW7" = MedPink, "GW7 [Zhou]" = DarkPink, "GW8 [Zhou]" = DarkRed, "GW10" = LightRed, "GW10 [Zhou]" = DarkOrange, "GW12 [Zhou]" = LightOrange, "GW15 [Zhou]" = Mustard, "GW16" = LightYellow, "GW18" = GreenLighest, "GW18 [Zhou]" = GreenMedDark, "GW19" = BlueDark, "GW20" = BlueMedDark, "GW20 [Zhou]"= BlueLighest, "GW22" = LightPurple, "GW25"= DarkPurple) #16
 
@@ -567,26 +563,280 @@ FirstpassClustering$Pop = ifelse(FirstpassClustering$Pop %in% "Ependymal" & Firs
 
 FirstpassClustering$Pop = gsub("NeuronalProgenitors", "Neuroepithelial", FirstpassClustering$Pop)
 CleanedClusters_Figure1 = FirstpassClustering
+write.csv(CleanedClusters_Figure1, "CleanedClusters_Figure1_19DEC22.csv")
+
+
+########### CLEAN INTERMED PROGENITORS
+ClusteForIntProg_Pt1 = subset()
+CleanedClusters_Figure1 = read.csv("~/Dropbox/LabMac/CleanedClusters_Figure1_19DEC22.csv", row.names =2)
+
+ClusteForIntProg2 = subset(KaZhouAll@meta.data, KaZhouAll@meta.data$sample %in% c("CS13", "CS14", "CS15",  "CS22_2_hypo", "CS22_hypo", "GW7_Lane1", "GW7_Lane2", "GW8_1", "GW8_2") & KaZhouAll@meta.data$Fig1Clusters == "Neuronal" | KaZhouAll@meta.data$Fig1Clusters == "Neuroepithelial")
+ClusteForIntProg2_Seu = subset(KaZhouAll, cells = row.names(ClusteForIntProg2))
+Rest_Seu = subset(KaZhouAll, cells = row.names(ClusteForIntProg2), invert=T)
+
+FP = FeaturePlot(KaZhouAll, c("TOP2A", "CDK1", "ALDOC", "ALDH1L1", "GPR50", "TBX3", "COL25A1", "COL23A1", "ELAVL4", "DCX", "PDGFRA", "SOX10", "OLIG1", "DEUP1", "FOXJ1", "HOPX", "VCAM1", "NKX6-1", "FGF8"), raster = T)
+pdf(paste(FilePath, "Fig1Supp_RG_All.pdf", sep=""), width = 20, height = 20)
+print(FP)
+dev.off()
+
+FP = FeaturePlot(KaZhouAll, unique(c("PCLAF", "ALDOC", "PLA2G7", "CLU", "EDNRB", "AW047730", "NDNF", "NID1", "DKK3", "", "KCNE1L", "GDF10", "FOXG1", "FOXJ1", "TM4SF1", "WNT8B", "DYNLRB2", "MEIG1", "SHISA8", "IFITM3", "DEUP1", "RARRES2", "CCNO", "MYB", "NTN1", "WLS", "RIIAD1", "RSPH1", "CALML4", "CFAP126", "GM28050", "PLTP", "CLEC3B", "FAM183B", "CDKN1A", "PIFO", "CHCHD10", "MLF1", "HIPK1", "TMEM107", "RNASE4", "TEKT1", "ODF3B", "DMKN", "HSPA2", "EZR", "RSPH4A", "TPPP3", "GM19935", "CLU", "ENKUR", "GAS6", "ACOT5", "CCDC39", "CFAP45", "HDC", "RSPO2", "LRRC23", "TUBB3", "IGFBPL1", "ELAVL4", "INSM1", "NHLH2", "ELAVL3", "TAGLN3", "INA", "GADD45G", "ABRACL", "ELAVL2", "DCX", "HES6", "MLLT11", "PDGFRA", "CNTN1", "OLIG1", "SERPINE2", "GPR17", "LHFPL3", "CSPG4", "C1QL1", "SOX10", "OLIG2", "NCALD", "PCDH11X", "MFSD2A", "PCDH15", "SCRG1", "EPN2", "BCAN", "GRIA2", "OPCML", "PID1", "CACNG4", "CDO1", "ENPP2", "ANKS1B", "GPR37L1", "GM45153", "CAR8", "MATN4", "PLPPR1", "OLFM2", "PTPRE", "QPCT", "ZDHHC2", "GM2A", "PHLDA1", "MMP15", "BRINP3", "RGCC", "KCND2", "GM42583", "DNM3", "OSTF1", "TPM1", "SAPCD2", "PIK3R1", "ALCAM", "SPRY1", "MMP16", "GATM", "SHH", "NKX2-4", "RAX", "SLIT2", "NKX2-4", "CCND2", "COL25A1", "", "ATF3", "CDKN1C", "", "DLK1", "RAX", "SIX3", "COL23A1", "FOSB", "GPC3", "TBX3", "SCN9A", "CEBPD", "MIA", "SIX3OS1", "FBN2", "IGFBP2", "SIX6", "PRELP", "FZD5", "MAF", "NKX2-4", "SPARCL1", "CLU", "S100A6", "SLC7A11", "CLDN10", "NTRK2", "SERPINE2", "DTNA", "NKAIN4", "ATP1B1", "SLC6A11", "HOPX", "PDZPH1", "RAMP1", "PBXIP1", "PREX2", "MIA", "SIX6", "IGFBPL1", "CP", "SIX3OS1", "H19", "FOSB", "MAF", "ZIC1", "IGFBP5", "COL2A1", "SELENOP")), ncol=8, raster = T)
+pdf(paste(FilePath, "Fig1Supp_RG_All.pdf", sep="") , width = 50, height = 50)
+print(FP)
+dev.off()
+
+
+FP = FeaturePlot(KaZhouAll, unique(c("SOX2", "VIM", "NES", "HES1", "MKI67", "FABP7", "SLC1A3", "TTYH1", "HMGA2", "FAM107A", "NKX2-1", "ASCL1", "NHLH2", "DLX1", "DLX2", "HMGA2", "ARHGAP28", "TTYH1", "FAM107A", "VIM1", "NES", "SOX2", "PAX6", "TOP2A", "CDK1", "PDGFRA", "SOX10", "OL1G1", "DEUP1", "FOXJ1", "HOPX", "VCAM1", "NKX6-1", "FGF8", "SIX6", "IGFBPL1", "CP", "SIX3OS1", "H19", "FOSB", "MAF", "ZIC1", "IGFBP5", "COL2A1", "SELENOP")), raster = T)
+pdf(paste(FilePath, "Fig1Supp_RG_Zhang.pdf", sep="") , width = 15, height = 20)
+print(FP)
+dev.off()
+
+FP = FeaturePlot(KaZhouAll, unique(c("MAFB", "PDZPH1", "FRZB", "SCN7A", "FOXJ1", "RAX", "ADM",  "EMX2", "LHX2", "TMEM212", "CRYM", "CCDC153", "RFX2", "RFX3", "RFX4", "NPAS3", "COL23A1", "CD59", "SLC17A8", "VCAN", "FRZB", "PENK", "COL25A1", "CACNA2D2", "STOML3", "TMEM212", "SLC7A11", "PCP4L1", "PLTP", "TGFB2", "NR2E1", "EPHB1", "P3H2", "NELL2", "FGF10", "RGCC", "GRIA2", "RLBP1", "SIX6", "SCN7A", "MEST", "IGFBP5", "RGS7BP")), raster = T)
+pdf(paste(FilePath, "Fig1Supp_RG_Tany.pdf", sep="") , width = 20, height = 30)
+print(FP)
+dev.off()
+
+FP = FeaturePlot(ClusteForIntProg2_Seu, c("STMN2", "SYT1", "VIM1", "NEUROG2", "ASCL1", "EBF2", "NHLH1", "EBF3", "RND2", "RSPO3", "OTP", "SOX2", "LHX2", "VIM", "HES1", "NGN2", "SOX11", "DLL1", "DLL2", "DLX1", "DLX2"), raster = T)
+pdf(paste(FilePath, "Fig1Supp_IntProg_Reclusterable.pdf", sep=""), width = 20, height = 20)
+print(FP)
+dev.off()
+
+FP = FeaturePlot(Rest_Seu, c("STMN2", "SYT1", "VIM1", "NEUROG2", "ASCL1", "EBF2", "NHLH1", "EBF3", "RND2", "RSPO3", "OTP", "SOX2", "LHX2", "VIM", "HES1", "NGN2", "SOX11", "DLL1", "DLL2", "DLX1", "DLX2"), raster = T)
+pdf(paste(FilePath, "Fig1Supp_IntProg_AlreadyAssigned.pdf", sep=""), width = 20, height = 20)
+print(FP)
+dev.off()
+
+DimPlot(KaZhouAll, raster=T)
+
+
+CleanedClusters_Figure1 = read.csv("~/Dropbox/LabMac/CleanedClusters_Figure1_19DEC22.csv", row.names =2)
+IntProg2 = subset(KaZhouAll, idents = c("Neuronal"))
+set.dim = 30
+set.res = c(1)
+set.kparam = c(10)
+ClusterFunc_All_RNA(IntProg2)
+
+DefaultAssay(IntProg2) = "integrated"
+IntProg2 <- FindNeighbors(IntProg2, k.param=50, dims=1:30)
+IntProg2 <- FindClusters(IntProg2, resolution = 2)
+IPC2 = subset(IntProg2, idents = c(9,12))
+IPC3 = subset(IntProg2, idents = c(15))
+
+CleanedClusters_Figure1$Pop = ifelse(row.names(CleanedClusters_Figure1) %in% colnames(IPC2), "IntProgen_2", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = ifelse(row.names(CleanedClusters_Figure1) %in% colnames(IPC3), "IntProgen_3", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = ifelse(CleanedClusters_Figure1$Pop %in% "IntProgen", "IntProgen_1", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = ifelse(CleanedClusters_Figure1$Pop %in% "Dividing", "cRGC", CleanedClusters_Figure1$Pop)
+CleanedClusters_Figure1$Pop = gsub("RadialGlia", "qRGC", gsub("Neuroepithelial", "tRGC",  CleanedClusters_Figure1$Pop))
+
+write.csv(CleanedClusters_Figure1, "CleanedClusters_Figure1_15JUL23.csv")
+
+
+
+
+
+
 
 p = plot_ly(CleanedClusters_Figure1, x = ~umap_1, y = ~umap_2, z = ~umap_3, size = 1, color = ~Pop) 
 htmlwidgets::saveWidget(p, paste("~/CheckOverlap_Reassigned2.html", sep=""))
-write.csv(CleanedClusters_Figure1, "CleanedClusters_Figure1_19DEC22.csv")
 
 save(list = (c("KaZhouAll", "InitialCellAssignments_3D", "InitialCellAssignments", "KaZhouAll_UMAP", "KaZhou_3D", "CleanedClusters_Figure1")), file = paste(FilePath, "Hypo_SciAdv_Fig1.RData", sep=""))
 
 ```
 
+
+
+#RADIAL GLIA
+```{r}
+# Ascl1+ IPCs that co-express Sox3, Gsx1 and Isl1 become either glutamatergic or GABAergic neurons. In a similar way, expression of Ngn2 together with Nhlh2, Neurod1 and Otp selectively specifies glutamatergic neurons in the lateral POA and the PVN50 (see below).
+
+#Transcriptional phenotyping of the human hypothalamus51 at GW10 identified six NPC clusters, all co-expressing Vim, Nes and Ascl1. Although GW10 in humans is the period when hypothalamic neurogenesis peaks, the molecular identifiers detected in human NPCs match those in mouse at E11.5 and E15.5. In addition to Vim, Nes and Ascl1, mouse NPCs40,41,50,51 also express Rax, Ngn2, Lhx2, Lhx1, Nhlh2 and Hes1 (Fig. 2d). This classification was recently refined40 by identifying gene modules for three principal NPC clusters destined to topographically different end points in mouse: a cluster expressing Ascl1 and Ngn2 for mediobasal areas, a cluster expressing Lhx1 for anterior territories, and a cluster expressing Ngn2 and Neurod1 for the mammillary complex. Further work in chick embryos associated Foxa2 expression with mammillary and PVN neurogenesis and Six6, Fgf10 and Rax expression with terminal (midventral) regional specification43. A remarkable conclusion from this work is that Rax+ hypothalamic NPCs transiently express Pax6, which otherwise marks the prethalamus, suggesting that prethalamic and midventral NPCs are temporarily coincident38,43.
+
+pdf(paste(FilePath, "Fig1Supp_BeneTextGenes.pdf", sep=""), width = 15, height = 15)
+print(FeaturePlot(KaZhouAll, unique(toupper(c("Ascl1", "Sox3", "Gsx1",  "Isl1", "NEUROG2",  "Nhlh2", "Neurod1", "Otp", "Vim", "Nes", "Rax", "Ngn2", "Lhx2", "Lhx1", "Nhlh2", "Hes1", "Foxa2", "Six6", "Fgf10", "Rax", "Pax6"))), raster = T))
+dev.off()
+
+#Upper level depicts NPCs (hypothalamic radial glia; hRG) residing in the ventricular zone (VZ) at the wall of the third ventricle (3V). hRGs produce IPCs (hypothalamic mantle radial glia; hmRG) by asymmetric division, which reside in the mantle zone (MZ). Both hRGs and hmRGs radiate processes towards the pial surface.
+
+
+pdf(paste(FilePath, "Fig1Supp_BeneGenesFigure.pdf", sep=""), width = 15, height = 15)
+print(FeaturePlot(KaZhouAll, c("RAX","ASCL1",  "SOX2", "LHX2", "VIM","NES", "HES1", "NEUROG2", "SOX11", "DLL1", "DLL2", "DLX1", "DLX2", "COL23A1"), raster = T))
+dev.off()
+
+
+pdf(paste(FilePath, "Fig1Supp_ZhouGenesFigure.pdf", sep=""), width = 15, height = 15)
+print(FeaturePlot(KaZhouAll, c("SOX2", "SOXA1","VIM",  "NES", "HES1", "MKI67","FABP7", "SLC1A3", "TTYH1", "HMGA2", "FAM107A", "NKX2-1", "ASCL1", "NHLH2", "DLX1", "DLX2", "NHLH2", "DLX1", "DLC5", "OLIG1", "OLIG5", "VCAM1", "RAX", "SHH"), raster = T))
+dev.off()
+```
+
+
+
+
+
+#FIG1-NEW-PLOTS
+```{r}
+KaZhouAll = readRDS("~/Dropbox/LabMac/KaZhouAll_mt10_integrated.rds")
+#CleanedClusters_Figure1 = read.csv("~/Dropbox/LabMac/CleanedClusters_Figure1_15JUL23.csv", row.names =2)
+
+#CleanedClusters_Figure1 = read.csv("~/Dropbox/LabMac/CleanedClusters_Figure1_19DEC22.csv", row.names =2)
+
+PopOrder = c("tRGC", "cRGC", "qRGC", "IntProgen_1", "IntProgen_2", "IntProgen_3", "Neuronal", "Oligodendrocytes [Dividing]",  "Oligodendrocytes [Immature]", "Oligodendrocytes [Intermediate]",  "Oligodendrocytes [Mature]", "Astrocytes", "Ependymal", "Tanycytes", "Microglia",   "Pericytes", "vSMC",  "VLMC",   "Endothelial",  "Blood")
+
+###############################################
+############## ORGANIZE METADATA ##############
+###############################################
+#Cluster annotations
+Fig1Assignments = CleanedClusters_Figure1 %>% dplyr::select(Pop)
+#Fig1Assignments$Pop = factor(Fig1Assignments$Pop, levels = PopOrder)
+KaZhouAll = AddMetaData(KaZhouAll, Fig1Assignments, "Fig1Assignments")
+
+#Timepoints
+CleanedClusters_Figure1_Meta$Timepoint = gsub("_.*", "", gsub("T", "", gsub("CS13", "GW6", gsub("CS14", "GW7", gsub("CS15",  "GW7", gsub("CS22", "GW10",  CleanedClusters_Figure1_Meta$sample))))))
+CleanedClusters_Figure1_Meta$Timepoint2 = ifelse(CleanedClusters_Figure1_Meta$Study == "Zhou", paste(CleanedClusters_Figure1_Meta$Timepoint, "[Zhou]"), CleanedClusters_Figure1_Meta$Timepoint)
+
+CleanedClusters_Figure1_Meta$Timepoint = factor(CleanedClusters_Figure1_Meta$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25" ))
+CleanedClusters_Figure1_Meta$Timepoint2 = factor(CleanedClusters_Figure1_Meta$Timepoint2, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+
+#3D UMAP
+colnames(CleanedClusters_Figure1) = c("Row.names", "Pop", "UMAP_1", "UMAP_2", "UMAP_3")
+CleanedClusters_Figure1_Meta = merge(CleanedClusters_Figure1, KaZhouAll@meta.data, by = 0)
+
+
+###############################################
+############## TIMEPOINTS PLOTS ###############
+###############################################
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, sizes = 1, size = 1, color = ~Timepoint, colors = TimepointColors_Fetal)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1_3D_BySample.html", sep=""))
+
+#Timepoints by sample
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, sizes = 1, size = 1,color = ~Timepoint2, colors = TimepointColors_FetalZhou)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1Supp_3D_BySampleStudy.html", sep=""))
+
+
+###############################################
+############ CLUSTER ASSIGN PLOTS #############
+###############################################
+#By Assignment
+p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, size = 1, sizes = 1, color = ~Fig1Assignments, colors = CellPopColors, type="scatter3d")
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure1_3D_AllAssignments.html", sep=""))
+
+#UMAPs for supplemental
+Plot = list()
+for(x in c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25")){
+Idents(KaZhouAll) = "Timepoint2"
+Subs = subset(KaZhouAll, idents = x)  
+Idents(Subs) = "Fig1Assignments"
+
+Plot[[x]] = DimPlot(Subs,  cols = CellPopColors, raster=F, pt.size = 0.1) + xlim(-10, 16) + ylim(-12, 16)+theme(axis.title = element_blank(), axis.ticks = element_line(color = "lightgrey"), axis.text = element_blank(), axis.line  = element_line(color = "lightgrey")) +NoLegend()
+}
+Combined = ggarrange(plotlist = Plot, ncol = 4, nrow=4)
+
+pdf(paste(FilePath, "Fig1Supp_SamplesSplit.pdf", sep=""), width = 10, height = 10)
+print(Combined)
+dev.off()
+
+
+###############################################
+############## STACKED BAR PLOT ###############
+###############################################
+# Main Text
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "Timepoint")
+for(x in unique(CleanedClusters_Figure1_Meta$Timepoint)){
+Subs= subset(CleanedClusters_Figure1_Meta, CleanedClusters_Figure1_Meta$Timepoint == x) 
+MetaTable = as.data.frame(table(Subs$Pop))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$Timepoint = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents2 = merge(CompilePercents, CellPopColors, by.x = "Var1", by.y = 0)
+CompilePercents2$Var1 = factor(CompilePercents2$Var1, levels = rev(PopOrder))
+CompilePercents2$Timepoint = factor(CompilePercents2$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25"))
+  
+StackedPlot = ggplot(CompilePercents2, aes(fill=Var1, y=Percent, x=Timepoint)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text = element_text(size = 12), axis.title.y = element_text(size = 12), legend.title = element_blank()) + scale_fill_manual(values = CellPopColors)
+
+pdf(paste(FilePath, "Fetal_ForPaper_StackedbyPercent.pdf", sep=""), width = 7.5, height = 2.8)
+print(StackedPlot)
+dev.off()
+#Fig1Assignments
+# Supplemental
+CompilePercents = as.data.frame(matrix(ncol =3, nrow=0))
+colnames(CompilePercents) = c("Var1", "Percent", "Timepoint2")
+for(x in unique(CleanedClusters_Figure1_Meta$Timepoint2)){
+Subs= subset(CleanedClusters_Figure1_Meta, CleanedClusters_Figure1_Meta$Timepoint2 == x) 
+MetaTable = as.data.frame(table(Subs$Fig1Assignments))
+MetaTable$Percent = MetaTable$Freq/dim(Subs)[1]*100
+MetaTable$Freq = NULL
+MetaTable$Timepoint2 = x
+CompilePercents = rbind(CompilePercents, MetaTable)
+}
+CompilePercents$Var1 = factor(CompilePercents$Var1, levels = rev(PopOrder))
+CompilePercents$Timepoint = factor(CompilePercents$Timepoint, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
+  
+StackedPlot = ggplot(CompilePercents, aes(fill=Var1, y=Percent, x=Timepoint)) + geom_bar(position="stack", stat="identity") + ylab("% cells") + xlab("") + scale_y_continuous( expand= c(0,0)) + theme_classic() + theme(legend.position = "none", axis.text = element_text(size = 12), axis.title.y = element_text(size = 12), legend.title = element_blank()) + scale_fill_manual(values = CellPopColors)
+
+pdf(paste(FilePath, "Fetal_ForPaper_Supp_StackedbyPercent_13DEC22.pdf", sep=""), width = 8, height = 2.8)
+print(StackedPlot)
+dev.off()
+
+
+###############################################
+################## DOT PLOT ###################
+###############################################
+KaZhouAll@meta.data$Fig1Assignments = factor(KaZhouAll@meta.data$Fig1Assignments, levels = rev(PopOrder))
+Idents(KaZhouAll) = "Fig1Assignments"
+DefaultAssay(KaZhouAll) = "RNA"
+DP = DotPlot(KaZhouAll, assay = "RNA", features= unique(c("HMGA2", "IGFBP5", "COL2A1", "MKI67", "TOP2A", "CDK1", "VCAM1", "NES", "SOX2", "VIM",  "FABP7", "TTYH1", "SLC1A3",  "ASCL1", "EGFR", "NHLH2",  "NEUROD1", "NEUROG2",   "STMN2", "SYT1", "OLIG1","OLIG2","APOD","PDGFRA",  "MBP", "PLP1", "MAG", "MOG",  "GJA1", "GFAP", "AQP4", "ALDOC", "SLC1A2",  "CCDC153",  "CRYM", "C1QB", "AIF1", "RGS5",  "KCNJ8", "ABCC9", "ACTA2", "TAGLN", "LUM", "DCN", "COL1A1",  "PDGFRB", "CLDN5", "ITM2A", "FLT1", "HBA2", "OLIG1")), dot.min = 0.15,  cols = c("#FFFFFF", BlueMedDark)) + theme(axis.text.x = element_text(size=10, face="italic", angle = 90, vjust = 0.5, hjust=1), axis.text.y = element_text(size=10), legend.title = element_text(size=8)) + ylab("") #
+
+pdf(paste(FilePath, "Fetal_ForPaper_Fig1DotPlot_JULY23.pdf", sep=""), width = 15, height = 5)
+print(DP)
+dev.off()
+
+
+
+###############################################
+############# SUPPLEMENTAL TABLES #############
+###############################################
+#By Sample
+CleanedClusters_Figure1_Meta$count = 1
+CleanedClusters_Figure1_Meta$Row.names = NULL
+SupTable1 = CleanedClusters_Figure1_Meta %>% group_by(Timepoint2) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+write.csv(SupTable1, "SciAdv_SupTable1.csv", row.names = F)
+
+
+#By Cluster
+KaZhouAll@meta.data$count = 1
+SupTable4 = KaZhouAll@meta.data %>% group_by(Fig1Assignments) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
+SupTable4$Fig1Assignments = factor(SupTable4$Fig1Assignments, levels = PopOrder)
+SupTable4 = SupTable4[order(SupTable4$Fig1Assignments), ]
+write.csv(SupTable4, "SciAdv_SupTable4.csv", row.names = F)
+
+#Differential Expression
+DefaultAssay(KaZhouAll) = "RNA"
+Idents(KaZhouAll) = "Fig1Assignments"
+Fig1_DEGs = FindAllMarkers(KaZhouAll, only.pos = T)
+Fig1_DEGsPos = subset(Fig1_DEGs, Fig1_DEGs$p_val_adj < 0.05 & Fig1_DEGs$avg_log2FC > 0.5)
+write.csv(Fig1_DEGsPos, "Fig1_DEGsPos.csv")
+
+CheckGW7 = subset(KaZhouAll@meta.data, KaZhouAll@meta.data$Timepoint2 == "GW8 [Zhou]")
+
+table(CheckGW7$Fig1Assignments)
+
+#GW10: Zhou = 79.7, Kreg = 56.2
+```
+
+
 #FIG1-PLOTS
 ```{r FIG1-PLOTS}
-#FilePath = "~/Library/CloudStorage/Box-Box/HG2553 Personal Folder/Science Advances/"
-KaZhouAll = readRDS("~/Downloads/KaZhouAll_mt10_integrated.rds")
-CleanedClusters_Figure1 = read.csv("~/Downloads/CleanedClusters_Figure1_19DEC22.csv", row.names =1)
+#FilePath = "~/Library/CloudStorage/Box-Box/HG2553 Main Folder/Science Advances/"
+KaZhouAll = readRDS("~/Dropbox/LabMac/KaZhouAll_mt10_integrated.rds")
+CleanedClusters_Figure1 = read.csv("~/Dropbox/LabMac/CleanedClusters_Figure1_19DEC22.csv", row.names =2)
 
 
-PopOrder = c("Neuroepithelial", "Dividing", "RadialGlia", "IntProgen", "Oligodendrocytes [Dividing]",  "Oligodendrocytes [Immature]", "Oligodendrocytes [Intermediate]",  "Oligodendrocytes [Mature]","NeuronalProgenitors",  "Neuronal", "Astrocytes", "Ependymal", "Tanycytes", "Microglia",   "Pericytes", "vSMC",  "VLMC",   "Endothelial",  "Blood")
+
+
 
 colnames(CleanedClusters_Figure1) = c("Row.names", "Pop", "UMAP_1", "UMAP_2", "UMAP_3")
-CleanedClusters_Figure1_Meta = merge(CleanedClusters_Figure1, KaZhouAll@meta.data, by.x = "Row.names", by.y = 0)
+CleanedClusters_Figure1_Meta = merge(CleanedClusters_Figure1, KaZhouAll@meta.data, by = 0)
 
 
 CleanedClusters_Figure1_Meta$Timepoint = gsub("_.*", "", gsub("T", "", gsub("CS13", "GW6", gsub("CS14", "GW7", gsub("CS15",  "GW7", gsub("CS22", "GW10",  CleanedClusters_Figure1_Meta$sample))))))
@@ -597,9 +847,7 @@ CleanedClusters_Figure1_Meta$Timepoint2 = ifelse(CleanedClusters_Figure1_Meta$St
 CleanedClusters_Figure1_Meta$Timepoint = factor(CleanedClusters_Figure1_Meta$Timepoint, levels = c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25" ))
 CleanedClusters_Figure1_Meta$Timepoint2 = factor(CleanedClusters_Figure1_Meta$Timepoint2, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
 
-CleanedClusters_Figure1_Meta$count = 1
-SupTable1 = CleanedClusters_Figure1_Meta %>% group_by(Timepoint2) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
-write.csv(SupTable1, "SciAdv_SupTable1.csv", row.names = F)
+
 
 ############## FIGURE 1B ##############
 p = plot_ly(CleanedClusters_Figure1_Meta, x = ~UMAP_3, y = ~UMAP_2, z = ~UMAP_1, size = 1, color = ~Timepoint, colors = TimepointColors_Fetal)
@@ -626,7 +874,7 @@ Fig1Assignments$Pop = factor(Fig1Assignments$Pop, levels = PopOrder)
 KaZhouAll@meta.data$Timepoint2 = factor(KaZhouAll@meta.data$Timepoint2, levels = c("GW6", "GW7", "GW7 [Zhou]", "GW8 [Zhou]", "GW10", "GW10 [Zhou]", "GW12 [Zhou]", "GW15 [Zhou]", "GW16", "GW18", "GW18 [Zhou]", "GW19" ,"GW20", "GW20 [Zhou]", "GW22", "GW25"))
 
 Plot = list()
-KaZhouAll = AddMetaData(KaZhouAll, Fig1Assignments, "Fig1Assignments")
+
 for(x in unique(KaZhouAll@meta.data$Timepoint2)){
 Idents(KaZhouAll) = "Timepoint2"
 Subs = subset(KaZhouAll, idents = x)  
@@ -692,19 +940,15 @@ Fig1Assignments$Pop = factor(Fig1Assignments$Pop, levels = rev(PopOrder))
 KaZhouAll = AddMetaData(KaZhouAll, Fig1Assignments, "Fig1Assignments")
 Idents(KaZhouAll) = "Fig1Assignments"
 DefaultAssay(KaZhouAll) = "RNA"
-DP = Seurat::DotPlot(KaZhouAll, assay = "RNA", features= c("HMGA2", "ARHGAP28", "MKI67","NES", "FABP7", "TTYH1", "SLC1A3",  "ASCL1", "EGFR", "OLIG1","OLIG2","APOD","PDGFRA",  "MBP", "PLP1", "MAG", "MOG", "STMN2", "SYT1", "GJA1", "GFAP", "AQP4", "ALDOC", "SLC1A2",  "CCDC153",  "CRYM", "C1QB", "AIF1", "RGS5",  "KCNJ8", "ABCC9", "ACTA2", "TAGLN", "LUM", "DCN", "COL1A1",  "PDGFRB", "CLDN5", "ITM2A", "FLT1", "HBA2"),  cols = c("#FFFFFF", HeatmapBlue), dot.min = 0.15) + theme(axis.text.x = element_text(size=10, face="italic", angle = 90, vjust = 0.5, hjust=1), axis.text.y = element_text(size=10), legend.title = element_text(size=8)) + ylab("")
+DP = Seurat::DotPlot(KaZhouAll, assay = "RNA", features= c("HMGA2", "ARHGAP28", "MKI67","NES", "FABP7", "TTYH1", "SLC1A3",  "ASCL1", "EGFR", "OLIG1","OLIG2","APOD","PDGFRA",  "MBP", "PLP1", "MAG", "MOG", "STMN2", "SYT1", "GJA1", "GFAP", "AQP4", "ALDOC", "SLC1A2",  "CCDC153",  "CRYM", "C1QB", "AIF1", "RGS5",  "KCNJ8", "ABCC9", "ACTA2", "TAGLN", "LUM", "DCN", "COL1A1",  "PDGFRB", "CLDN5", "ITM2A", "FLT1", "HBA2"),  cols = c("#FFFFFF", HeatmapBlue)) + theme(axis.text.x = element_text(size=10, face="italic", angle = 90, vjust = 0.5, hjust=1), axis.text.y = element_text(size=10), legend.title = element_text(size=8)) + ylab("") #, dot.min = 0.15
 
 
-pdf(paste(FilePath, "Fetal_ForPaper_Fig1DotPlot.pdf", sep=""), width = 15, height = 5)
+pdf(paste(FilePath, "Fetal_ForPaper_Fig1DotPlot_JULY23.pdf", sep=""), width = 15, height = 5)
 print(DP)
 dev.off()
 
 
-KaZhouAll@meta.data$count = 1
-SupTable4 = KaZhouAll@meta.data %>% group_by(Fig1Assignments) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
-SupTable4$Fig1Assignments = factor(SupTable4$Fig1Assignments, levels = PopOrder)
-SupTable4 = SupTable4[order(SupTable4$Fig1Assignments), ]
-write.csv(SupTable4, "SciAdv_SupTable4.csv", row.names = F)
+
 ```
 
 #FIG2-GENERATE-TRAJECTORIES
@@ -798,12 +1042,14 @@ M3SeuNODE <- order_cells(M3SeuNODE, root_pr_nodes=Vertexes[[1]][t])
 dir.create(file.path(paste(Filename, "/KVal", kval, sep=""), paste("Node", t, "_", Vertexes[[1]][t], sep="")))
 
 ####### FIG 2B
-p = plot_cells_3d(M3SeuNODE, color_cells_by = "SampleAdult", color_palette = TimepointColors_FetalAdult)
+p = plot_cells_3d(M3SeuNODE, color_cells_by = "SampleAdult",size = 1, sizes = 1, color_palette = TimepointColors_FetalAdult)
 htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "SampleAdult.html", sep=""))
 
 ####### FIG 2C
-p = plot_cells_3d(M3SeuNODE, color_cells_by = "pseudotime")
-htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "Pseudotime.html", sep=""))
+p = plot_cells_3d(M3SeuNODE, color_cells_by = "pseudotime", cell_size = 10)
+htmlwidgets::saveWidget(p, "Pseudotime.html")
+
+
 p = plot_cells_3d(M3SeuNODE,color_cells_by = "partition")
 htmlwidgets::saveWidget(p, paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "k", kval, "Partition.html", sep=""))
 
@@ -898,16 +1144,17 @@ V(net.NODE)$color <- c("darkgray","skyblue3","skyblue2","gray")[V(net.NODE)$type
 V(net.NODE)$label <- V(net.NODE)$rbl #V(net.NODE)$label <- ""
 E(net.NODE)$arrow.mode <- 0
 #Used in Fig 2E & F and supplementals
-lrt.NODE = layout.reingold.tilford(net.NODE)
+lrt.NODE = layout_as_tree(net.NODE)
 pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineage.pdf", sep=""),width=12,height=8)
 print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
 dev.off()
 
 V(net.NODE)$label <- ""
-lrt.NODE = layout.reingold.tilford(net.NODE)
+lrt.NODE = layout_as_tree(net.NODE)
 pdf(paste(Filename,  "/KVal", kval, "/Node", t, "_", Vertexes[[1]][t], "/", SeuName, "_PC",get.PCs,"_U",get.UMAPs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageNoLabs.pdf", sep=""),width=12,height=8)
 print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
 dev.off()
+
 
 #Used for assigning lineages
 V(net.NODE)$label <- V(net.NODE)$name #V(net.NODE)$label <- ""
@@ -966,8 +1213,11 @@ perSamp[[i]] = tmpPer
 }
  
 V(net.NODE)$pie.color=list(c("#fecf29","#538d22","#ff7aa2"))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
 perSamp2=perSamp[V(net.NODE)$name]
- 
+#V(net.NODE)$size <- c(10,5,3,2)[V(net.NODE)$type2]
+
 pdf(file=paste('./MainLineage_WithLabs_', LIN, '.pdf', sep=""))
 plot(net.NODE,layout=lrt.NODE,
  vertex.shape="pie",
@@ -975,20 +1225,131 @@ plot(net.NODE,layout=lrt.NODE,
  vertex.pie=perSamp2,
  vertex.label.dist=0.8,
  vertex.label.cex=0.6,
- vertex.label.degree=pi)#, edge.width=1:10)
+ vertex.label.degree=pi, vertex.frame.color="darkgrey", xlim = c(-2, 2), ylim = c(-1, 1))
 dev.off()
- 
-pdf(file=paste('./MainLineage_NoLabs_', LIN, '.pdf', sep=""))
+
+pdf(file=paste('./MainLineage_NoLabs_', LIN, '.pdf', sep=""), width = 20, height = 20)
 plot(net.NODE,layout=lrt.NODE,
  vertex.shape="pie",
- vertex.size=3,
+ vertex.size=2.5,
  vertex.pie=perSamp2,
- vertex.label=NA, edge.width=1:10)
+ #edge.width=seq(1,10),
+ vertex.label=NA, pie.density = 0.05, vertex.frame.color =list(c("#fecf29","#538d22","#ff7aa2")))
 dev.off()
   
 }
+
+
+MRTreeRes = readRDS("~/Downloads/Sci Adv/tree80_L15_treeTrim.rds")
+Resolutions = as.data.frame(MRTreeRes)
+Resolutions$K560 = gsub(558, 11, gsub(554, 544, gsub(551, 348,  Resolutions$K560)))
+Resolutions$K494 = gsub(508, 29,  Resolutions$K494)
+
+dir.create(file.path("./", paste(LIN, "MRTreeToTrajectoryK560/", sep="_")))
+for(t in sort(unique(Resolutions$K560))){
+PullCluster = subset(Resolutions, Resolutions$K560 == t)
+EdKaZhouHypoNeurons$Other = "Other"
+EdKaZhouHypoNeurons@meta.data[colnames(EdKaZhouHypoNeurons) %in% row.names(PullCluster),'Other'] = 'TargetPop'
+
+for(i in names(perSamp)){
+tmp = table(EdKaZhouHypoNeurons$Other[which(EdKaZhouHypoNeurons$Vertex==i)])
+tmp2=c(0,0,0)
+names(tmp2)=c("TargetPop","Other")
+tmpov = intersect(names(tmp),names(tmp2))
+tmp2[tmpov] = tmp[tmpov]
+tmpPer = round((tmp2/length(which(EdKaZhouHypoNeurons$Vertex==i)))*100,0)
+perSamp[[i]] = tmpPer
+}
+ 
+V(net.NODE)$pie.color=list(c("#fecf29","darkslateblue"))
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste('./', LIN, '_MRTreeToTrajectoryK560/MainLineage_NoLabs_', LIN, 'Cluster', t, 'fromK55.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE,
+ vertex.shape="pie",
+ vertex.size=2.5,
+ vertex.pie=perSamp2,
+ vertex.label=NA, pie.density = 0.05, vertex.frame.color =list(c("#fecf29","darkslateblue")))
+dev.off()
+
+
+}
 ```
 
+```{r}
+MainAssign = read.csv("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_3_k100AssignsByBarc.csv", na.strings=c("","NA"))
+MainAssign2 = MainAssign %>% dplyr::select(Nuclei)
+row.names(MainAssign2) = MainAssign$Barcs
+for(LIN in c("3_k20", "3_k150", "6_k100")){ #, ))
+AltAssign = read.csv(paste("~/Dropbox/LabMac/Fig2_Trajectories_GLOTMP_17JAN_20_20_", LIN, "AssignsByBarc.csv", sep=""), na.strings=c("","NA"))
+AltAssign2 = AltAssign %>% dplyr::select(Nuclei)
+row.names(AltAssign2) = AltAssign$Barcs
+AltName = ifelse(LIN == "3_k20", "Alt1", "")
+AltName = ifelse(LIN == "3_k150", "Alt2", AltName)
+AltName = ifelse(LIN == "6_k100", "Alt3", AltName)
+colnames(AltAssign2) = paste(colnames(AltAssign2), AltName, sep="_")
+MainAssign2 = merge(MainAssign2, AltAssign2, by = 0, all = T)
+row.names(MainAssign2) = MainAssign2$Row.names
+MainAssign2$Row.names = NULL
+}
+
+
+MRTreeRes = readRDS("~/Downloads/tree80_L15_treeTrim.rds")
+Resolutions = as.data.frame(MRTreeRes)
+Resolutions$K560 = gsub(558, 11, gsub(554, 544, gsub(551, 348,  Resolutions$K560)))
+Resolutions$K494 = gsub(508, 29,  Resolutions$K494)
+Resolutions$Barcs = row.names(Resolutions)
+
+K560_Annots = read.csv("~/Dropbox/LabMac/Adult_CellTypeAssigns.csv")
+ResolutionsAllCells = merge(Resolutions, K560_Annots,  by = "K560", all=T)
+
+
+K560_AnnotsReduced = ResolutionsAllCells %>% dplyr::select("Nuclei_K560", "K560")
+row.names(K560_AnnotsReduced) = ResolutionsAllCells$Barcs
+colnames(K560_AnnotsReduced) = c("MRTree_Nuclei", "MRTree_Cluster")
+
+MainAssign3 = merge(MainAssign2, K560_AnnotsReduced, by = 0, all = T)
+
+predictions = readRDS("~/Dropbox/Columbia/predictions.rds")
+HypoMapPred = predictions$Region_summarized
+HypoMapPred2 = HypoMapPred %>% dplyr::select("predicted.id", "prediction.score.max")
+HypoMapPred2 = subset(HypoMapPred2, HypoMapPred2$prediction.score.max >= 0.3)
+colnames(HypoMapPred2) = paste(colnames(HypoMapPred2), "_RegSum")
+
+HypoMapRegionPred = predictions$Region_predicted
+HypoMapRegionPred2 = HypoMapRegionPred %>% dplyr::select("predicted.id", "prediction.score.max")
+HypoMapRegionPred2 = subset(HypoMapRegionPred2, HypoMapRegionPred2$prediction.score.max >= 0.3)
+colnames(HypoMapRegionPred2) = paste(colnames(HypoMapRegionPred2), "_RegPred")
+
+MainAssign4 = merge(MainAssign3, HypoMapPred2, by.x = "Row.names", by.y = 0, all =T)
+MainAssign5 = merge(MainAssign4, HypoMapRegionPred2, by.x = "Row.names", by.y = 0, all =T)
+MainAssign5$`predicted.id _RegSum` = gsub("Arcuate hypothalamic nucleus", "ARC", gsub("Lateral hypothalamic area", "LH", gsub("Ventromedial hypothalamic nucleus", "VMH", gsub("Dorsal premammillary nucleus", "DPN", gsub("Tuberomamillary nucleus", "TM", gsub("Suprachiasmatic nucleus", "SMN", gsub("Paraventricular hypothalamic nucleus", "PVH", gsub("Medial mammillary nucleus", "MMN", gsub("\\(Pre\\)Mammillary region",  "PN", MainAssign5$`predicted.id _RegSum`)))))))))
+MainAssign5$`predicted.id _RegPred` = gsub("Arcuate hypothalamic nucleus", "ARC", gsub("Lateral hypothalamic area", "LH", gsub("Ventromedial hypothalamic nucleus", "VMH", gsub("Dorsal premammillary nucleus", "DPN", gsub("Tuberomamillary nucleus", "TM", gsub("Suprachiasmatic nucleus", "SMN", gsub("Paraventricular hypothalamic nucleus", "PVH", gsub("Medial mammillary nucleus", "MMN", gsub("\\(Pre\\)Mammillary region",  "PN", MainAssign5$`predicted.id _RegPred`)))))))))
+
+MainAssign5[is.na(MainAssign5)] = "NA"
+#####################
+
+CompilePercentages = as.data.frame(matrix(ncol = 8, nrow = 0))
+colnames(CompilePercentages) = c("MRTree_Cluster", "Nuclei", "Nuclei_Alt1", "Nuclei_Alt2", "Nuclei_Alt3", "MRTree_Nuclei", "predicted.id _RegSum", "predicted.id _RegPred")
+
+for(y in unique(MainAssign5$MRTree_Cluster)){
+PullClust = subset(MainAssign5, MainAssign5$MRTree_Cluster == y)
+Compile = c(y)
+for(x in c("Nuclei", "Nuclei_Alt1", "Nuclei_Alt2", "Nuclei_Alt3", "MRTree_Nuclei", "predicted.id _RegSum", "predicted.id _RegPred")){
+MainTraject = as.data.frame(table(PullClust[x]))
+MainTraject = MainTraject[order(-MainTraject$Freq), ]
+MainTraject2 = paste(paste(MainTraject[[1]], " [", round(MainTraject$Freq/dim(PullClust)[1]*100, digits = 1), "%]", sep=""), collapse=", ")
+Compile = c(Compile, MainTraject2)
+}
+Compile = as.data.frame(t(Compile))
+colnames(Compile) = c("MRTree_Cluster", "Nuclei", "Nuclei_Alt1", "Nuclei_Alt2", "Nuclei_Alt3", "MRTree_Nuclei", "predicted.id _RegSum", "predicted.id _RegPred")
+
+CompilePercentages = rbind(CompilePercentages, Compile)
+}
+
+
+write.csv(CompilePercentages, "CompilePercentages_AllMethologies.csv", row.names = F)
+```
 
 
 #FIG2-ADDITIONAL-PLOTS
@@ -2033,6 +2394,33 @@ MusRefEdKaZhou@meta.data$StudyAll =   gsub("GW20_34_hypo", "Herb [Human Fetal]",
                                             gsub("Wen", "Wen [Mouse Adult SCN]", MusRefEdKaZhou@meta.data$StudyAll)))))))))))))
 
 MusRefEdKaZhou@meta.data$StudyAll = factor(MusRefEdKaZhou@meta.data$StudyAll, levels = names(Fig3_Colors_Study))
+
+##
+hypoMap = readRDS("~/Dropbox/Columbia/Sci Adv/hypoMapHuman.rds")
+Idents(hypoMap) = "C2_named"
+hypoMapNeuro = subset(hypoMap, idents = c("C2-1: Neurons"))
+rm(hypoMap)
+
+MissingCells = subset(hypoMap, cells = colnames(MusRefEdKaZhou), invert=T)
+Idents(MissingCells) = "C2_named"
+hypoMapMissingCellsNeuro = subset(MissingCells, idents = c("C2-1: Neurons"))
+
+
+CheckMeta = subset(hypoMap@meta.data, hypoMap@meta.data$Dataset %in% c("KimDev10x", "RomanovDev10x"))
+CheckMeta$Barcs = gsub("_SRR9303105", "", gsub("_SRR9214103", "", gsub("-.*", "", row.names(CheckMeta))))
+
+CheckMetaMusKa = subset(MusRefEdKaZhou@meta.data, MusRefEdKaZhou@meta.data$StudyAll %in% c("Kim [Mouse Development]", "Romanov [Mouse Development]"))
+CheckMetaMusKa$Barcs = gsub(".*_", "", row.names(CheckMetaMusKa))
+
+DefInHypoMap = subset(CheckMetaMusKa, CheckMetaMusKa$Barcs %in% CheckMeta$Barcs)
+
+length(intersect(CheckMeta$Barcs, CheckMetaMusKa$Barcs))
+
+Read = readRDS("~/Downloads/GSE132355_E10-P45_log2cpm.rds") #Counts Matrix? - Blackshaw
+ReadSeu = CreateSeuratObject(Read)
+
+Read = readRDS("~/Downloads/GSE132730_TractNAE_integrated.rds") #Romanov Seurat
+##
 
 MusRefEdKaZhou@meta.data$count = 1
 SupTableFig3 = MusRefEdKaZhou@meta.data %>% group_by(StudyAll, NewSampleID) %>% dplyr::summarise("nCells" = sum(count),	"nCount_mean" = mean(nCount_RNA),	"nCount_median" = median(nCount_RNA),	"nCount_sd" = sd(nCount_RNA),	"nFeature_mean" = mean(nFeature_RNA),	"nFeature_median" = median(nFeature_RNA),	"nFeature_sd" = sd(nFeature_RNA),	"percMT_mean" = mean(percent.mt),	"percMT_median"= median(percent.mt),	"percMT_sd"= sd(percent.mt))
