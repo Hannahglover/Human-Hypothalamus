@@ -1,0 +1,387 @@
+###############################################
+####### GENERATE PSEUDOTIME TRAJECTORIES ######
+###############################################
+library(tidyverse)
+library(igraph)
+library(monocle3)
+library(Seurat)
+library(plotly)
+library(ggalluvial)
+
+#Colors
+LightPink =   "#ffc2d4"
+MedPink =     "#ff9ebb"
+DarkPink =    "#ff7aa2"
+DarkRed =     "#9e1b44"
+LightRed =    "#d64050"
+DarkOrange =  "#f36c44"
+LightOrange = "#faad60"
+Mustard =     "#fecf29"
+LightYellow = "#fee08b"
+GreenLighest ="#aad576"
+GreenMedLight="#78a02d"
+GreenMedDark ="#538d22"
+GreenDark =   "#245501"
+BlueDark =    "#133c55"
+BlueMedDark = "#386fa4"
+BlueMedLight ="#59a5d8"
+BlueLighest = "#84d2f6"
+LightPurple = "#b185db"
+DarkPurple =  "#7251b5"
+Grey =        "#666666"
+HeatmapBlue = BlueMedDark
+
+TimepointColors_Fetal = c("GW6" = LightPink, "GW7" = MedPink, "GW8" = DarkPink, "GW10" = DarkRed, "GW12" = LightRed, "GW15"=  DarkOrange, 
+                          "GW16" =LightOrange, "GW18" =  Mustard,  "GW19" = LightYellow,"GW20"= GreenLighest,  "GW22" = GreenMedLight, 
+                          "GW25" = GreenMedDark,  "0D" = GreenDark,"42D" = BlueDark, "54D"= BlueMedDark, "225D" = BlueMedLight, 
+                          "29Y" = BlueLighest, "42Y" = LightPurple, "50Y" = DarkPurple) #12
+        
+Stage_Fetal = c("Trimester 1"= "#ff7aa2", "Trimester 2" = "#fecf29", "Neonate" = "#538d22", "Adult" = "#b185db")
+
+NucleiColors = c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed,  "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark,   "SMN" =BlueMedLight, "MN"= BlueLighest, "ZI" = LightPurple,  "Unassigned" = "darkgrey", "Fetal" = "lightgrey")
+
+ClassColors = c("Glutaminergic" = "#d64151", "GABAergic" = "#386fa4","Histaminergic" = "#aad576", "Unknown" =  "darkgrey", "Fetal" =  "lightgrey")
+
+
+
+
+HumNeurons = readRDS("/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder/Science Advances/R Notebooks and RDS/HypoNeoNeur_29AUG23.rds")
+#HumNeurons = readRDS("/Users/hannahglover/Documents/HypoNeoNeur_29AUG23.rds")
+HumNeurons$Timepoint = ifelse(HumNeurons$Age %in% c(29, 42, 50), paste0(HumNeurons$Age, "Y"), HumNeurons$Timepoint)
+HumNeurons@meta.data$Age
+HumNeurons$Stage = ifelse(HumNeurons$Timepoint %in% c("GW6", "GW7", "GW8", "GW10", "GW12"), "Trimester 1", "Trimester 2")
+HumNeurons$Stage = ifelse(HumNeurons$Timepoint %in% c("0D", "42D", "54D", "225D"), "Neonate", HumNeurons$Stage)
+HumNeurons$Stage = ifelse(HumNeurons$Timepoint %in% c("29Y", "42Y", "50Y"), "Adult", HumNeurons$Stage)
+
+#Add Known adult nuclei
+MRTreeRes = readRDS("/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder/Science Advances/R Notebooks and RDS/tree80_L15_treeTrim.rds") 
+Resolutions = as.data.frame(MRTreeRes)
+Resolutions$K560 = gsub(558, 11, gsub(554, 544, gsub(551, 348,  Resolutions$K560)))
+Resolutions$K494 = gsub(508, 29,  Resolutions$K494)
+Resolutions$Barcodes = row.names(Resolutions)
+
+Adult_Annots = read.csv("/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder/Science Advances/AllHumanAnnots_MR.csv")
+Adult_Annots_All = merge(Resolutions, Adult_Annots, by.x = "K560", by.y = "H369", all=T)
+
+for(x in colnames(Adult_Annots_All)){
+  PullMeta = Adult_Annots_All %>% dplyr::select(x)  
+  row.names(PullMeta) = Adult_Annots_All$Barcodes
+  HumNeurons = AddMetaData(HumNeurons, PullMeta, x)  
+}
+
+HumNeurons@meta.data$H108_Class = gsub("Ambiguous", "Unknown", HumNeurons@meta.data$H108_Class)
+HumNeurons@meta.data$H108_Class = ifelse(HumNeurons@meta.data$Age %in% c(29, 42, 50), HumNeurons@meta.data$H108_Class, "Fetal")
+HumNeurons@meta.data$H108_Nuclei = ifelse(HumNeurons@meta.data$Age %in% c(29, 42, 50), HumNeurons@meta.data$H108_Nuclei, "Fetal")
+
+
+FilePath = "/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder/Science Advances/Trajectories - SEP23/"
+
+GeneList = c("SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1",  "SLC17A6", "SLC17A8", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SIM1", "POU3F2",  "NHLH2", "MC4R", "OXT", "AVP", "CRH", "GAL", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "PITX2", "FOXP1", "FOXP2", "FOXB1", "SOX14",  "FEZF2", "LHX1", "HCRT", "CARTPT", "PMCH", "LHX2", "LHX9", "PDYN", "RGS16","LHX1", "GRP", "VIP", "CCK", "VAX1", "SIX3", "SIX6" , "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5", "PPP1R17", "NKX2-2", "LHX8", "NR2F1", "NR2F2", "HMX3", "RELN", "MEIS2", "ARX", "LHX6", "PRDM8")
+
+Dimensions = data.frame(PCA = c(20, 20, 20, 20), spread = c(3, 3, 3, 6), kval = c(100, 20, 150, 100))
+StartTime = c("GW6", "GW7", "GW8") #Timepoint
+SeuName = "Fig2_TrajectoriesSep23"
+
+
+
+
+
+for(x in 3:dim(Dimensions)[1]){
+  PullDim = subset(Dimensions, row.names(Dimensions) %in% x)
+  get.PCs = PullDim[[1]]
+  get.spread = PullDim[[2]]
+  get.kval = PullDim[[3]]
+  
+  Filename = paste(SeuName, "_PC",get.PCs, "_S", get.spread, sep="")
+  DefaultAssay(HumNeurons) = "integrated"
+  HumNeurons = RunPCA(HumNeurons, npcs = get.PCs)
+  HumNeurons <- RunUMAP(HumNeurons, dims = 1:get.PCs, spread= get.spread, n.components = 3)
+  
+  DefaultAssay(HumNeurons) = "RNA"
+  
+  ### monocle 3
+  dir.create(file.path(paste0(FilePath, Filename)))
+  write.csv(HumNeurons@reductions$umap@cell.embeddings, paste0(FilePath, Filename, "/3D_UMAP_Coords.csv"))
+  
+  geneMeta = data.frame(gene_short_name=rownames(HumNeurons))    
+  rownames(geneMeta) = rownames(HumNeurons)
+  DefaultAssay(HumNeurons) = 'integrated' 
+  M3Seu <- new_cell_data_set(HumNeurons@assays$RNA@counts,cell_metadata = HumNeurons@meta.data, gene_metadata = geneMeta)
+  M3Seu <- preprocess_cds(M3Seu, num_dim = get.PCs)
+  M3Seu <- reduce_dimension(M3Seu)
+  M3Seu@reduce_dim_aux$gene_loadings = HumNeurons@reductions[["pca"]]@feature.loadings[,1:get.PCs]
+  reducedDims(M3Seu)[['UMAP']] = HumNeurons@reductions[["umap"]]@cell.embeddings ## from code - UMAP by cell 
+  kval = get.kval
+  dir.create(file.path(FilePath, Filename, paste("KVal", kval, sep="")))
+  M3Seu <- cluster_cells(M3Seu,reduction_method = "UMAP", k = kval, random_seed=12345)
+  M3Seu <- learn_graph(M3Seu)
+  
+  Pull = as.data.frame(paste('Y_',M3Seu@principal_graph_aux[['UMAP']]$pr_graph_cell_proj_closest_vertex[,1],sep=''))
+  row.names(Pull) = colnames(M3Seu)
+  colnames(Pull) = "Vertex"
+  HumNeurons = AddMetaData(HumNeurons, Pull, "Vertex")
+  write.csv(Pull, paste(FilePath, Filename, "_k", kval, "_AllVertices.csv", sep=""))
+  HumNeurons@meta.data$Vertex = NULL
+  Pull2 = merge(Pull, HumNeurons@meta.data, by = 0)
+  
+  Pull2$Val = 1
+  Pull_n = as.data.frame(table(Pull2$Timepoint))
+  Pull3 = Pull2 %>% dplyr::group_by(Vertex, Timepoint) %>% dplyr::summarise(n_ = sum(Val, na.rm=T))
+  Pull4 = as.data.frame(table(Pull2$Vertex))
+  Pull5 = merge(Pull3, Pull4, by.x = "Vertex", by.y = "Var1")
+  #Pull5$Percent = Pull5$n_/Pull5$Freq
+  PullEarly = subset(Pull5, Pull5$Timepoint == StartTime)
+  PullEarly2 = PullEarly %>% group_by(Vertex) %>% summarise("EarlyTP" = sum(n_), "totVertex" = sum(Freq))
+  PullEarly2$Percent = PullEarly2$EarlyTP/PullEarly2$totVertex
+  PullEarly2 = PullEarly2[order(-PullEarly2$Percent), ]
+
+  
+  OUTS = as.data.frame(M3Seu@clusters$UMAP$partitions)
+  OUTS2 = merge(OUTS, Pull, by = 0)
+  OUTS3 = as.data.frame(table(OUTS2$`M3Seu@clusters$UMAP$partitions`))
+  OUTS3$Perc = OUTS3$Freq/ dim(OUTS)[1]
+  OUTS4 = subset(OUTS3, OUTS3$Perc > 0.4)
+  OUTS5 = subset(OUTS2, OUTS2$`M3Seu@clusters$UMAP$partitions` == 1)
+  
+  Vertexes = subset(PullEarly2, PullEarly2$Vertex %in% OUTS5$Vertex)
+  
+  StartingVertex = Vertexes[[1]][[1]]
+  if(dim(OUTS4)[1] <= 0.5){
+    BadPartitions =  0
+    write.csv(BadPartitions, paste(Filename, "/KVal", kval,  "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "BADPARTITIONS.csv", sep=""))
+  }else{
+  #if(dim(OUTS4)[1] == 1){
+  t = 1
+  #for(t in seq(1,3,1)){
+  M3SeuNODE = M3Seu
+  M3SeuNODE <- order_cells(M3SeuNODE, root_pr_nodes=StartingVertex)
+  dir.create(file.path(paste(FilePath, Filename, "/KVal", kval, sep=""), paste("Node", t, "_", StartingVertex, sep="")))
+  
+  # FIG 2F
+  p = plot_cells_3d(M3SeuNODE, color_cells_by = "pseudotime", cell_size = 10)
+  htmlwidgets::saveWidget(p, paste(FilePath, Filename,  "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "k", kval, "Pseudotime.html", sep=""))
+  
+  
+  p = plot_cells_3d(M3SeuNODE,color_cells_by = "partition")
+  htmlwidgets::saveWidget(p, paste(FilePath, Filename,  "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "k", kval, "Partition.html", sep=""))
+  
+  tmpLin = M3SeuNODE@principal_graph_aux[['UMAP']]["pseudotime"][[1]]
+  tmpLin[which(tmpLin==Inf)] =50
+  M3SeuNODEpseu = tapply(X=tmpLin,INDEX=Pull$Vertex,FUN=mean, na.rm = TRUE)
+  ###M3SeuNODEpseu = tapply(X=tmpLin,INDEX=colData(M3SeuNODE)$vertex,FUN=mean, na.rm = TRUE)
+  mleaves = monocle3:::leaf_nodes(M3SeuNODE,reduction_method='UMAP') ## 48  - 
+  #colData(M3SeuNODE)$MonocleLeaf = NA
+  #colData(M3SeuNODE)$MonocleLeaf[colData(M3SeuNODE)$Vertex%in%names(mleaves)] = colData(M3SeuNODE)$Vertex[colData(M3SeuNODE)$Vertex%in%names(mleaves)]
+
+  mbranches = monocle3:::branch_nodes(M3SeuNODE,reduction_method='UMAP') ##49
+  #colData(M3SeuNODE)$MonocleBranch = NA
+  #colData(M3SeuNODE)$MonocleBranch[colData(M3SeuNODE)$Vertex%in%names(mbranches)] = colData(M3SeuNODE)$Vertex[colData(M3SeuNODE)$Vertex%in%names(mbranches)]
+
+  #colrange_branches <- colorRampPalette(c("#d1e3d1", "#087508")) #green
+  #colrange_branches_n <- colrange_branches(length(unique(mbranches)))
+  #colrange_branches_ndf = as.data.frame(colrange_branches_n)
+  #colrange_branches_ndf$Vertex = unique(mbranches)
+  #colnames(colrange_branches_ndf) = c("Colour", "Vertex")
+  
+  #colrange_leaves <- colorRampPalette(c("#ffd4b3", "#f77007")) #orange
+  #colrange_leaves_n <- colrange_leaves(length(unique(mleaves)))
+  #colrange_leaves_ndf = as.data.frame(colrange_leaves_n)
+  #colrange_leaves_ndf$Vertex = unique(mleaves)
+  #colnames(colrange_leaves_ndf) = c("Colour", "Vertex")
+  
+  #CombineColors = rbind(colrange_leaves_ndf, colrange_branches_ndf)
+  #CombineColors = CombineColors[order(CombineColors$Vertex), ]
+  #OutsColor =  CombineColors$Colour
+  #names(OutsColor) = paste("Y_", CombineColors$Vertex, sep="")
+  
+  #p=plot_cells_3d(M3SeuNODE,color_cells_by = "Leaves_Branches",color_palette=OutsColor)
+  #htmlwidgets::saveWidget(p, paste(FilePath, Filename, "/KVal", kval,  "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval,  "MonocleLeavesandBranches.html", sep=""))
+  
+  rtti287m = data.frame(root=rep(StartingVertex,length(unique(mleaves))), leaf=paste("Y_", unique(mleaves), sep=""))
+  rtti287m2 = subset(rtti287m, rtti287m$leaf %in% OUTS5$Vertex)
+  linksNODE = data.frame(matrix(ncol = 3, nrow = 0))
+  colnames(linksNODE) = c("from", "to", "weight")
+  for(i in seq(1, nrow(rtti287m2), 1)){
+    FROM=rtti287m2$root[i]
+    TO=rtti287m2$leaf[i]
+    lins = shortest_paths(M3SeuNODE@principal_graph[['UMAP']],FROM,TO)[1]
+    lins2 = unlist(lins)
+    tmpEdge = data.frame(from = paste('Y_',as.vector(lins2[-length(lins2)]),sep=''),to=paste('Y_',as.vector(lins2[-1]),sep=''))
+    tmpWeight = abs(M3SeuNODEpseu[tmpEdge$to] - M3SeuNODEpseu[tmpEdge$from])
+    tmpEdge$weight = tmpWeight    
+    linksNODE = rbind(linksNODE,tmpEdge)
+  }
+  
+
+  linksNODE = unique(linksNODE)
+  nodesNODE = data.frame(id=unique(c(linksNODE$from,linksNODE$to)))
+  nodesNODE$type = 'lineage'
+  nodesNODE$type[nodesNODE$id%in%names(table(linksNODE$from)[which(table(linksNODE$from)>1)])] = 'branch' 
+  nodesNODE$type[nodesNODE$id==PullEarly[[1]][t]] = 'root'
+  nodesNODE$type[nodesNODE$id%in%names(table(c(linksNODE$from,linksNODE$to))[which(table(c(linksNODE$from,linksNODE$to))==1)])] = 'leaf'
+  nodesNODE$type2 = 4
+  nodesNODE$type2[nodesNODE$id%in%names(table(linksNODE$from)[which(table(linksNODE$from)>1)])] = 3
+  nodesNODE$type2[nodesNODE$id==PullEarly[[1]][t]] = 1
+  nodesNODE$type2[nodesNODE$id%in%names(table(c(linksNODE$from,linksNODE$to))[which(table(c(linksNODE$from,linksNODE$to))==1)])] = 2
+  nodesNODE$rbl = nodesNODE$id
+  nodesNODE$rbl[nodesNODE$type%in%'lineage']='' ## can add other columns with metadata
+  net.NODE <- graph_from_data_frame(d=linksNODE, vertices=nodesNODE, directed=T)
+  V(net.NODE)$size <- c(10,5,3,2)[V(net.NODE)$type2]
+  V(net.NODE)$frame.color <- "white"
+  V(net.NODE)$color <- c("darkgray","skyblue3","skyblue2","gray")[V(net.NODE)$type2]
+  V(net.NODE)$label <- V(net.NODE)$rbl #V(net.NODE)$label <- ""
+  E(net.NODE)$arrow.mode <- 0
+  #Used in Fig 2E & F and supplementals
+  lrt.NODE = layout_as_tree(net.NODE)
+  pdf(paste(FilePath, Filename,  "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineage.pdf", sep=""),width=12,height=8)
+  print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+  dev.off()
+  
+  V(net.NODE)$label <- ""
+  lrt.NODE = layout_as_tree(net.NODE)
+  pdf(paste(FilePath, Filename,  "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageNoLabs.pdf", sep=""),width=12,height=8)
+  print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+  dev.off()
+  
+  
+  #Used for assigning lineages
+  V(net.NODE)$label <- V(net.NODE)$name #V(net.NODE)$label <- ""
+  pdf(paste(FilePath, Filename,  "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "ShortestPath_MainLineageAllLabs.pdf", sep=""),width=24,height=16)
+  print(plot(net.NODE,layout=lrt.NODE,vertex.label.cex=0.5))
+  dev.off()
+  
+  write.csv(nodesNODE, paste(FilePath, Filename, "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "_NodesOrder.csv", sep=""))
+  
+  HumNeurons = AddMetaData(HumNeurons, Pull, "Vertex")
+  
+  
+  ### BY TRIMESTER
+  perSamp = vector(mode='list',length=length(unique(HumNeurons$Vertex)))
+  names(perSamp)=unique(HumNeurons$Vertex)
+  
+  for(i in names(perSamp)){
+    tmp = table(HumNeurons$Stage[which(HumNeurons$Vertex==i)])
+    tmp2=rep(0, length(unique(HumNeurons$Stage)))
+    names(tmp2)=c("Trimester 1","Trimester 2", "Neonate","Adult")
+    tmpov = intersect(names(tmp),names(tmp2))
+    tmp2[tmpov] = tmp[tmpov]
+    tmpPer = round((tmp2/length(which(HumNeurons$Vertex==i)))*100,0)
+    perSamp[[i]] = tmpPer
+  }
+  
+  V(net.NODE)$pie.color=list(c("#ff7aa2",  "#fecf29", "#538d22", "#b185db"))
+  V(net.NODE)$lty = 0.0001
+  E(net.NODE)$Weight = 0.1
+  perSamp2=perSamp[V(net.NODE)$name]
+  
+  pdf(file=paste(FilePath, Filename,"/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, '_MainLineage_ByTrimester.pdf', sep=""), width = 20, height = 20)
+  plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+  dev.off()
+  
+  
+  ### BY TIMEPOINT
+  perSamp = vector(mode='list',length=length(unique(HumNeurons$Vertex)))
+  names(perSamp)=unique(HumNeurons$Vertex)
+  
+  for(i in names(perSamp)){
+    tmp = table(HumNeurons$Timepoint[which(HumNeurons$Vertex==i)])
+    tmp2=rep(0, length(unique(HumNeurons$Timepoint)))
+    names(tmp2)=c("GW6", "GW7", "GW8", "GW10", "GW12", "GW15", "GW16", "GW18", "GW19", "GW20", "GW22", "GW25", "0D",   "42D",  "54D",  "225D", "29Y",  "42Y",  "50Y")
+    tmpov = intersect(names(tmp),names(tmp2))
+    tmp2[tmpov] = tmp[tmpov]
+    tmpPer = round((tmp2/length(which(HumNeurons$Vertex==i)))*100,0)
+    perSamp[[i]] = tmpPer
+  }
+  
+  
+  V(net.NODE)$pie.color=list(c("#ffc2d4", "#ff9ebb", "#ff7aa2", "#9e1b44", "#d64050", "#f36c44", "#faad60", "#fecf29", 
+                               "#fee08b", "#aad576", "#78a02d", "#538d22", "#245501", "#133c55", "#386fa4", "#59a5d8", 
+                               "#84d2f6", "#b185db", "#7251b5"))
+  V(net.NODE)$lty = 0.0001
+  E(net.NODE)$Weight = 0.1
+  perSamp2=perSamp[V(net.NODE)$name]
+  
+  pdf(file=paste(FilePath, Filename,"/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, '_MainLineage_ByTimepoint.pdf', sep=""), width = 20, height = 20)
+  plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+  dev.off()
+
+
+
+
+### BY NUCLEI 
+perSamp = vector(mode='list',length=length(unique(HumNeurons$Vertex)))
+names(perSamp)=unique(HumNeurons$Vertex)
+
+for(i in names(perSamp)){
+  tmp = table(HumNeurons$H108_Nuclei[which(HumNeurons$Vertex==i)])
+  tmp2=rep(0, length(unique(HumNeurons$H108_Nuclei)))
+  names(tmp2)=c("TM", "ARC", "PVH", "VMH", "DMH", "LH", "SCN", "PO",  "SMN", "MN", "ZI",  "Unassigned", "Fetal")
+  tmpov = intersect(names(tmp),names(tmp2))
+  tmp2[tmpov] = tmp[tmpov]
+  tmpPer = round((tmp2/length(which(HumNeurons$Vertex==i)))*100,0)
+  perSamp[[i]] = tmpPer
+}
+
+V(net.NODE)$pie.color=list(c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed,  "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark,  "SMN" = BlueLighest, "MN"= LightPurple, "ZI" = DarkPurple,  "Unassigned" = "darkgrey", "Fetal" = "lightgrey"))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste(FilePath, Filename,"/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, '_MainLineage_ByNuclei.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+dev.off()
+
+### BY NEUROTRANSMITTER
+perSamp = vector(mode='list',length=length(unique(HumNeurons$Vertex)))
+names(perSamp)=unique(HumNeurons$Vertex)
+
+for(i in names(perSamp)){
+  tmp = table(HumNeurons$H108_Class[which(HumNeurons$Vertex==i)])
+  tmp2=rep(0, length(unique(HumNeurons$H108_Class)))
+  names(tmp2)=c("Glutaminergic","GABAergic","Histaminergic", "Unknown", "Fetal")
+  tmpov = intersect(names(tmp),names(tmp2))
+  tmp2[tmpov] = tmp[tmpov]
+  tmpPer = round((tmp2/length(which(HumNeurons$Vertex==i)))*100,0)
+  perSamp[[i]] = tmpPer
+}
+
+V(net.NODE)$pie.color=list(c("#d64151","#386fa4","#aad576",  "darkgrey",  "lightgrey"))
+V(net.NODE)$lty = 0.0001
+E(net.NODE)$Weight = 0.1
+perSamp2=perSamp[V(net.NODE)$name]
+
+pdf(file=paste(FilePath, Filename,"/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, '_MainLineage_ByNeurotransmitter.pdf', sep=""), width = 20, height = 20)
+plot(net.NODE,layout=lrt.NODE, vertex.shape="pie", vertex.size=3, vertex.pie=perSamp2, vertex.label=NA)
+dev.off()
+
+
+  
+  #Used supplementals
+  ind = which(OUTS5$Vertex %in%nodesNODE$id)
+  for(i in c(GeneList)){ 
+    gene = i
+    tmpGene = HumNeurons@assays$RNA@counts[gene,ind]
+    tmpGeneVertex = tapply(X=tmpGene,INDEX=HumNeurons@meta.data$Vertex[ind],FUN=mean)
+    tmpGeneVertex2 = round(scales::rescale(tmpGeneVertex, to = c(1, 100)),0)
+    fun_color_range <- colorRampPalette(c("#919191", "red"))
+    my_colors <- fun_color_range(100)
+    tmpGeneColors = my_colors[tmpGeneVertex2]
+    names(tmpGeneColors) = names(tmpGeneVertex2)
+    V(net.NODE)$color <- tmpGeneColors[as.vector(nodesNODE$id)]
+    
+    pdf(paste(FilePath, Filename, "/KVal", kval,  "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs,"_s", get.spread, "_k", kval, "_ShortestPath_Lineage_", i, ".pdf", sep=""),width=12,height=8)
+    print(plot(net.NODE,layout=lrt.NODE, vertex.label =NA, label = i))
+    dev.off()
+  }
+ 
+  RunInfo = as.data.frame(t(c(OUTS4$Perc[[1]], StartingVertex, PullEarly2$Percent[[1]])) )
+  colnames(RunInfo) = c("% in Partition", "Starting Vertex", "% early cells in staring vertex")
+  write.csv(RunInfo, paste(FilePath, Filename, "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "_RunInfo.csv", sep=""))
+  
+ # save.image(paste(FilePath, Filename, "/KVal", kval,  "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs,"_s", get.spread, "_k", kval, "_Image.RData", sep=""))
+  
+}
+
+}
+#}
+#}
