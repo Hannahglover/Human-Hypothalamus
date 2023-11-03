@@ -1,3 +1,10 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# SETUP
+```{r}
 ###############################################
 ####### GENERATE PSEUDOTIME TRAJECTORIES ######
 ###############################################
@@ -41,10 +48,10 @@ Stage_Fetal = c("Trimester 1"= "#ff7aa2", "Trimester 2" = "#fecf29", "Neonate" =
 NucleiColors = c("TM"= LightPink, "ARC"= DarkPink, "PVH"= DarkRed,  "VMH"= DarkOrange, "DMH"= LightOrange, "LH"= Mustard, "SCN"= GreenLighest, "PO"= GreenMedDark,   "SMN" =BlueMedLight, "MN"= BlueLighest, "ZI" = LightPurple,  "Unassigned" = "darkgrey", "Fetal" = "lightgrey")
 
 ClassColors = c("Glutaminergic" = "#d64151", "GABAergic" = "#386fa4","Histaminergic" = "#aad576", "Unknown" =  "darkgrey", "Fetal" =  "lightgrey")
+```
 
-
-
-
+# READ DATA + ORGANIZE METADATA
+```{r}
 HumNeurons = readRDS("/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder/Science Advances/R Notebooks and RDS/HypoNeoNeur_29AUG23.rds")
 #HumNeurons = readRDS("/Users/hannahglover/Documents/HypoNeoNeur_29AUG23.rds")
 HumNeurons$Timepoint = ifelse(HumNeurons$Age %in% c(29, 42, 50), paste0(HumNeurons$Age, "Y"), HumNeurons$Timepoint)
@@ -78,15 +85,15 @@ FilePath = "/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder/
 
 GeneList = c("SLC32A1", "DLX1", "DLX2", "DLX5", "GAD1",  "SLC17A6", "SLC17A8", "SST",  "TH", "TRH","BDNF", "OTP","PCSK1", "NKX2-1", "KISS1", "GHRH", "POMC","NPY","AGRP", "HDC", "TBX3", "ISL1", "LEPR", "NPY1R", "CRABP1",  "HMX2","GSX1", "SIM1", "POU3F2",  "NHLH2", "MC4R", "OXT", "AVP", "CRH", "GAL", "GABRA5", "NPTX2", "FEZF1", "NR5A1", "PITX2", "FOXP1", "FOXP2", "FOXB1", "SOX14",  "FEZF2", "LHX1", "HCRT", "CARTPT", "PMCH", "LHX2", "LHX9", "PDYN", "RGS16","LHX1", "GRP", "VIP", "CCK", "VAX1", "SIX3", "SIX6" , "BARHL1", "FOXA1", "LMX1A",  "IRX3", "IRX5", "PPP1R17", "NKX2-2", "LHX8", "NR2F1", "NR2F2", "HMX3", "RELN", "MEIS2", "ARX", "LHX6", "PRDM8")
 
-Dimensions = data.frame(PCA = c(20, 20, 20, 20), spread = c(3, 3, 3, 6), kval = c(100, 20, 150, 100))
+Dimensions = data.frame(PCA = c(20, 20, 20, 30, 20), spread = c(6,3,10, 6, 6), kval = c(100, 100, 100, 100, 150))
 StartTime = c("GW6", "GW7", "GW8") #Timepoint
 SeuName = "Fig2_TrajectoriesSep23"
+```
 
 
-
-
-
-for(x in 3:dim(Dimensions)[1]){
+# TRAJECTORY ANALYSIS
+```{r}
+for(x in 1:dim(Dimensions)[1]){
   PullDim = subset(Dimensions, row.names(Dimensions) %in% x)
   get.PCs = PullDim[[1]]
   get.spread = PullDim[[2]]
@@ -120,7 +127,6 @@ for(x in 3:dim(Dimensions)[1]){
   row.names(Pull) = colnames(M3Seu)
   colnames(Pull) = "Vertex"
   HumNeurons = AddMetaData(HumNeurons, Pull, "Vertex")
-  write.csv(Pull, paste(FilePath, Filename, "_k", kval, "_AllVertices.csv", sep=""))
   HumNeurons@meta.data$Vertex = NULL
   Pull2 = merge(Pull, HumNeurons@meta.data, by = 0)
   
@@ -148,7 +154,7 @@ for(x in 3:dim(Dimensions)[1]){
   StartingVertex = Vertexes[[1]][[1]]
   if(dim(OUTS4)[1] <= 0.5){
     BadPartitions =  0
-    write.csv(BadPartitions, paste(Filename, "/KVal", kval,  "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "BADPARTITIONS.csv", sep=""))
+    write.csv(BadPartitions, paste(FilePath, Filename, "/KVal", kval,  "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "BADPARTITIONS.csv", sep=""))
   }else{
   #if(dim(OUTS4)[1] == 1){
   t = 1
@@ -373,15 +379,59 @@ dev.off()
     print(plot(net.NODE,layout=lrt.NODE, vertex.label =NA, label = i))
     dev.off()
   }
- 
+  write.csv(Pull, paste(FilePath, Filename, "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "_AllVertices.csv", sep=""))
+
   RunInfo = as.data.frame(t(c(OUTS4$Perc[[1]], StartingVertex, PullEarly2$Percent[[1]])) )
   colnames(RunInfo) = c("% in Partition", "Starting Vertex", "% early cells in staring vertex")
   write.csv(RunInfo, paste(FilePath, Filename, "/KVal", kval, "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs, "_s", get.spread, "_k", kval, "_RunInfo.csv", sep=""))
   
- # save.image(paste(FilePath, Filename, "/KVal", kval,  "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs,"_s", get.spread, "_k", kval, "_Image.RData", sep=""))
+save.image(paste(FilePath, Filename, "/KVal", kval,  "/Node", t, "_", StartingVertex, "/", SeuName, "_PC",get.PCs,"_s", get.spread, "_k", kval, "_Image.RData", sep=""))
   
 }
 
 }
 #}
 #}
+```
+
+# GENERAL PLOTS
+```{r}
+DefaultAssay(HumNeurons) = "integrated"
+HumNeurons = RunPCA(HumNeurons, npcs = 20)
+HumNeurons <- RunUMAP(HumNeurons, dims = 1:20, spread= 6, n.components = 3)
+  
+Get3D_coords = as.data.frame(HumNeurons@reductions$umap@cell.embeddings)
+
+## UMAP by Sample
+PullMeta = HumNeurons@meta.data%>% dplyr::select(Timepoint)
+
+CellAssignments_3D = merge(PullMeta, Get3D_coords, by = 0)
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, size = 1, sizes = 2, color = ~Timepoint, colors = TimepointColors_Fetal)
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure2_Samples_OCT23.html", sep=""))
+
+##########################################################################
+####################### Generate 3D FEATURE PLOTS ######################## 
+##########################################################################
+DefaultAssay(HumNeurons) = "RNA"
+
+PullMeta = FetchData(HumNeurons, vars = c("SLC32A1", "SLC17A6", "HDC"), slot = "counts")
+
+PullMeta$RecodeSLC32A1 = ifelse(PullMeta$SLC32A1 > 0,  "Pos", "Neg")
+PullMeta$RecodeHDC1 = ifelse(PullMeta$HDC > 10,  "Pos", "Neg")
+PullMeta$RecodeSLC17A6 = ifelse(PullMeta$SLC17A6 > 3,  "Pos", "Neg")
+
+CheckOverlap = subset(PullMeta, PullMeta$RecodeSLC32A1 == "Pos" & PullMeta$RecodeSLC17A6  == "Pos")
+CheckOverlap = subset(PullMeta, PullMeta$RecodeSLC32A1 == "Pos" & PullMeta$RecodeHDC1  == "Pos")
+CheckOverlap = subset(PullMeta, PullMeta$RecodeHDC1 == "Pos" & PullMeta$RecodeSLC17A6  == "Pos")
+  
+  
+CellAssignments_3D = merge(PullMeta, Get3D_coords, by = 0)
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~RecodeSLC32A1, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure2_FeaturePlot_RecodeSLC32A1_OCT23.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,sizes = 1,  size = 1, color = ~RecodeHDC1, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure2_FeaturePlot_RecodeHDC1_OCT23.html", sep=""))
+
+p = plot_ly(CellAssignments_3D, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, sizes = 1, size = 1, color = ~RecodeSLC17A6, colors =  c("lightgrey",BlueMedDark))
+htmlwidgets::saveWidget(p, paste(FilePath, "Figure2_FeaturePlot_RecodeSLC17A6_OCT23.html", sep=""))
+```
