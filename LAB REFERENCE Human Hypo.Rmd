@@ -13,6 +13,8 @@ library(tidyverse)
 # Data for 'Single-cell genomics reveals region-specific developmental trajectories underlying neuronal diversity in the human hypothalamus'. Science Advances. 2023
 
 #### Human Hypothalamus: all fetal cells - from paper figure 1
+Primary Analysis: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/SciAdv%20Submission/SciAdv_FIG1.Rmd
+
 Key Metadata:
 - CellAnnotations: Cluster annotations for cell assignments
 - Timepoint: Sample timepoint
@@ -24,6 +26,8 @@ x = readRDS("/Users/hannahglover/Library/CloudStorage/Box-Box/HG2553 Main Folder
 ```
 
 #### Human Hypothalamus: Neurons from paper figure 2
+Primary Analysis: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/SciAdv%20Submission/SciAdv_FIG2.Rmd
+
 Key Metadata:
 - SampleBroad: Fetal samples by time point, adult samples by dissection with timepoints pooled
 - SampleAdult: Fetal samples by time point, adult samples pooled together
@@ -51,6 +55,10 @@ DefaultAssay(EdKaZhouHypoNeurons) = "RNA"
 
 
 #### Human and mouse hypothalamus from paper figure 3
+Integration: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/IntegrateHumanNeuronswHypoMapDev.R
+Primary Analysis: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/SciAdv%20Submission/SciAdv_FIG3.Rmd
+
+
 Key Metadata:
 - DatasetClean: Data source including study, species and nuclei (where available)
 - Species: Mouse or Human
@@ -68,6 +76,9 @@ Hypothalamus_HumanMouseInt = readRDS("/Users/hannahglover/Library/CloudStorage/B
 # Additional Data - Also contains Neonate data from Huang et al.
 
 #### Human Hypothalamus - All cells: Fetal/Neonate [Equivalent to Figure 1 but with new clustering]
+Primary Analysis: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/NeoHypo_Integration.Rmd
+
+
 Key Metadata:
 - Study: Huang (Neonate), Kriegstein or Zhou (Both Fetal)
 - Timepoint: Specific timepoint
@@ -81,7 +92,12 @@ AllCells$SampleStudy = paste(AllCells@meta.data$Study, AllCells@meta.data$Timepo
 
 
 #### Human Neurons: Fetal/Neonate/Adult [Equivalent to Figure 2 but without clustering]
-Most Useful for feature plots as the neonate data has not been clustered
+Most useful for feature plots as the neonate data has not been clustered
+
+Primary Analysis: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/Integrate_All_HypoData_IncNeo.R
+Pseudotime Trajectories: https://github.com/Hannahglover/Human-Hypothalamus/blob/main/NeoTrajectories_SEP23.Rmd
+
+
 Key Metadata: 
 - Study: Huang (Neonate), Kriegstein (Herb primary daya), Zhou (Both Fetal), Siletti (Herb primary adult)
 - Stage: Trimester 1, trimester 2, neonate, adult
