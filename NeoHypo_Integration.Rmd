@@ -1,0 +1,101 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(plyr)
+library(Seurat)
+library(Signac)
+library(tidyverse)
+library(cowplot)
+library(celda)
+library(DoubletFinder)
+```
+
+
+##### QC #####
+```{r}
+NeoHypo.Data = list()
+QCViolins = list()
+QCHist = list()
+QCTable = as.data.frame(matrix(ncol=10, nrow=0))
+
+for(x in c("GSM4996670_DGE23", "GSM4996671_DGE24", "GSM4996672_DGE25", "GSM4996673_DGE26", "GSM4996674_DGE27", "GSM4996675_DGE28", "GSM4996676_DGE29", "GSM4996677_DGE30", "GSM4996678_DGE31", "GSM4996679_DGE32", "GSM4996680_DGE33", "GSM4996681_DGE34", "GSM4996682_DGE35", "GSM4996683_DGE36", "GSM4996684_DGE5051", "GSM4996685_DGE5253", "GSM4996686_DGE5455", "GSM4996687_DGE5657", "GSM4996688_DGE5859new")){
+NeoHypo.Data[[x]] = read.table(paste("~/Library/CloudStorage/Box-Box/HG2553 Main Folder/Huang 2021 - ARC organoids/GSE164101_RAW/", x, ".txt.gz", sep=""), head=T, row.names=1)
+ScreeingFile = CreateSeuratObject(counts = NeoHypo.Data[[x]], project = x, min.cells = 3, min.features = 0)
+ScreeingFile[["percent.mt"]] <- PercentageFeatureSet(ScreeingFile, pattern = "^MT-")
+NeoHypo.Data[[x]] = ScreeingFile
+QCViolins[[x]] = VlnPlot(ScreeingFile, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+TableData = as.data.frame(t(c(x, median(ScreeingFile$nFeature_RNA), mean(ScreeingFile$nFeature_RNA), sd(ScreeingFile$nFeature_RNA), median(ScreeingFile$nCount_RNA), mean(ScreeingFile$nCount_RNA), sd(ScreeingFile$nCount_RNA), median(ScreeingFile$percent.mt), mean(ScreeingFile$percent.mt), sd(ScreeingFile$percent.mt))))
+colnames(TableData) = c("Sample", "nFeature_Median", "nFeature_Mean", "nFeature_SD", "nCount_Median", "nCount_Mean", "nCount_SD", "percent.mt_Median", "percent.mt_Mean", "percent.mt_SD")
+QCTable = rbind(QCTable, TableData)
+QCHist[[x]] = ggplot(ScreeingFile@meta.data, aes(x=nFeature_RNA)) + 
+  geom_histogram(binwidth=30)+ ggtitle(x)+ scale_x_continuous(breaks = seq(0,max(ScreeingFile@meta.data$nFeature_RNA),200)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+}
+
+pdf(paste("NeoHypo_QC_Violins_1AUG23.pdf", sep=""), width=20, height=8)
+print(QCViolins)
+dev.off()
+
+pdf(paste("NeoHypo_QC_Histograms_1AUG23.pdf", sep=""), width=15, height=8)
+print(QCHist)
+dev.off()
+```
+
+##### SAMPLE NORMALIZATION AND PREP FOR INTEGRATION #####
+```{r}
+NeoHypo.DataV2 = NeoHypo.Data
+NeoHypo.DataV2[[18]] = NULL
+for(x in 1:length(NeoHypo.DataV2)){
+PullMeta = NeoHypo.DataV2[[x]]@meta.data
+PullMeta = subset(PullMeta, PullMeta$nFeature_RNA > 400 & PullMeta$nFeature_RNA < 4000 & PullMeta$Count_RNA > 1000 & PullMeta$nCount_RNA < 15000 & PullMeta$percent.mt <= 10)
+NeoHypo.DataV2[[x]] = subset(NeoHypo.DataV2[[x]], cells = row.names(PullMeta))
+NeoHypo.DataV2[[x]] <- NormalizeData(NeoHypo.DataV2[[x]])
+NeoHypo.DataV2[[x]] <- FindVariableFeatures(NeoHypo.DataV2[[x]], do.plot = F, display.progress = F)
+
+NeoHypo.DataV2[[x]] = ScaleData(NeoHypo.DataV2[[x]], vars.to.regress = c("nFeature_RNA", "percent.mt"),
+    verbose = F)
+NeoHypo.DataV2[[x]] = RunPCA(NeoHypo.DataV2[[x]], verbose = F, npcs = 20)
+}
+```
+
+##### INTEGRATION #####
+```{r}
+features <- SelectIntegrationFeatures(object.list = NeoHypo.DataV2)
+NeoHypo.anchors <- FindIntegrationAnchors(object.list = NeoHypo.DataV2, anchor.features = features)
+NeoHypo.combined <- IntegrateData(anchorset = NeoHypo.anchors)
+DefaultAssay(NeoHypo.combined) <- "integrated"
+NeoHypo.combined <- ScaleData(NeoHypo.combined, vars.to.regress = "percent.mt")
+NeoHypo.combined <- RunPCA(NeoHypo.combined, npcs = 30, verbose = FALSE)
+NeoHypo.combined <- RunUMAP(NeoHypo.combined, reduction = "pca", dims = 1:30)
+NeoHypo.combined@meta.data$Timepoint = ifelse(NeoHypo.combined@meta.data$orig.ident %in% "GSM4996684_DGE5051", "42D", "225D")
+NeoHypo.combined@meta.data$Timepoint = ifelse(NeoHypo.combined@meta.data$orig.ident %in% "GSM4996685_DGE5253", "0D", NeoHypo.combined@meta.data$Timepoint)
+NeoHypo.combined@meta.data$Timepoint = ifelse(NeoHypo.combined@meta.data$orig.ident %in% "GSM4996686_DGE5455", "54D", NeoHypo.combined@meta.data$Timepoint)
+NeoHypo.combined@meta.data$Timepoint = ifelse(NeoHypo.combined@meta.data$orig.ident %in% "GSM4996687_DGE5657", "141D", NeoHypo.combined@meta.data$Timepoint)
+NeoHypo.combined@meta.data$Timepoint = ifelse(NeoHypo.combined@meta.data$orig.ident %in% "GSM4996688_DGE5859new", "79D", NeoHypo.combined@meta.data$Timepoint)
+
+save(list=c("NeoHypo.combined"), file = "~/Library/CloudStorage/Box-Box/HG2553 Main Folder/Huang 2021 - ARC organoids/NeoHypo_StdIntegration_IncQC.rds")
+DefaultAssay(NeoHypo.combined) <- "RNA"
+```
+
+
+```{r}
+NeoHypo.combined = readRDS("~/Library/CloudStorage/Box-Box/HG2553 Main Folder/Huang 2021 - ARC organoids/NeoHypo_StdIntegration_IncQC.rds")
+NeoHypo.combined = readRDS("~/Downloads/NeoHypo_StdIntegration_IncQC.rds")
+load("~/Downloads/NeoHypo_StdIntegration_IncQC.rds")
+
+ArcOrg.combined = readRDS("~/Downloads/ArcOrg_StdIntegration.rds")
+load("~/Downloads/ArcOrg_StdIntegration.rds")
+DefaultAssay(ArcOrg.combined) <- "RNA"
+
+DefaultAssay(NeoHypo.combined) <- "RNA"
+
+pdf("NeoHypo.combined2.pdf", width = 15, height = 15)
+print(FeaturePlot(NeoHypo.combined, c("POMC", "SNAP25", "VIM", "RAX", "OLIG2", "PDGFRA", "MAG", "CLDN5", "AQP4", "SIM1", "POU3F2", "TBX3", "ISL1", "AGRP")))
+dev.off()
+```
+
+
+
